@@ -1,0 +1,15 @@
+{
+  "@context": {
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dct": "http://purl.org/dc/terms/",
+    "prov": "http://www.w3.org/ns/prov#",
+    "Dataset": "dcat:Dataset",
+    "identifier": "dct:identifier",
+    "title": "dct:title",
+    "description": "dct:description",
+    "distributions": "dct:distribution",
+    "producedBy": "prov:wasGeneratedBy",
+    "creators": "dct:creator",
+    "keywords": "dcat:keyword"
+  }
+}

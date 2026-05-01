@@ -1,0 +1,23 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "Person": "sdo:Person",
+    "identifier": "sdo:identifier",
+    "firstName": "sdo:givenName",
+    "lastName": "sdo:familyName",
+    "fullName": "sdo:name",
+    "email": "sdo:email",
+    "affiliations": "sdo:affiliation",
+    "roles": "sdo:roleName",
+    "alternateIdentifiers": "sdo:identifier",
+    "relatedIdentifiers": "sdo:identifier",
+    "middleInitial": {
+      "@id": "sdo:additionalName",
+      "@type": "sdo:Text"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

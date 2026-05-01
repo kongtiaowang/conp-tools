@@ -1,0 +1,90 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "Study": "sdo:Action",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "types": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Thing"
+    },
+    "startDate": {
+      "@id": "sdo:startTime",
+      "@type": "sdo:DateTime"
+    },
+    "endDate": {
+      "@id": "sdo:endTime",
+      "@type": "sdo:DateTime"
+    },
+    "dates": {
+      "@id": "sdo:temporalCoverage",
+      "@type": "sdo:Text"
+    },
+    "duration": {
+      "@id": "sdo:activityDuration",
+      "@type": "sdo:Duration"
+    },
+    "location": {
+      "@id": "sdo:location",
+      "@type": "sdo:Thing"
+    },
+    "performedBy": {
+      "@id": "sdo:agent",
+      "@type": "sdo:Thing"
+    },
+    "keywords": {
+      "@id": "sdo:keywords",
+      "@type": "sdo:Thing"
+    },
+    "input": {
+      "@id": "sdo:isBasedOn",
+      "@type": "sdo:Thing"
+    },
+    "output": {
+      "@id": "sdo:produces",
+      "@type": "sdo:Thing"
+    },
+    "schedulesActivity": {
+      "@id": "sdo:potentialAction",
+      "@type": "sdo:Action"
+    },
+    "schedulesDataAcquisition": {
+      "@id": "sdo: measurementTechnique",
+      "@type": "sdo:Thing"
+    },
+    "studyGroups": {
+      "@id": "sdo:member",
+      "@type": "sdo:Thing"
+    },
+    "usesReagent": {
+      "@id": "sdo:supply",
+      "@type": "sdo:Text"
+    },
+    "isAboutBiologicalEntity": {
+      "@id": "sdo:about",
+      "@type": "sdo:Thing"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

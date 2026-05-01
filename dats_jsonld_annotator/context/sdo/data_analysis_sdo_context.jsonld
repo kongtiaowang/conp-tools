@@ -1,0 +1,74 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "DataAnalysis": "sdo:Action",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "startDate": {
+      "@id": "sdo:startTime",
+      "@type": "sdo:DateTime"
+    },
+    "endDate": {
+      "@id": "sdo:endTime",
+      "@type": "sdo:DateTime"
+    },
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "dates": {
+      "@id": "sdo:temporalCoverage",
+      "@type": "sdo:Text"
+    },
+    "duration": {
+      "@id": "sdo:activityDuration",
+      "@type": "sdo:Duration"
+    },
+    "location": {
+      "@id": "sdo:location",
+      "@type": "sdo:Thing"
+    },
+    "performedBy": {
+      "@id": "sdo:agent",
+      "@type": "sdo:Thing"
+    },
+    "keywords": {
+      "@id": "sdo:keywords",
+      "@type": "sdo:Thing"
+    },
+    "input": {
+      "@id": "sdo:isBasedOn",
+      "@type": "sdo:Thing"
+    },
+    "output": {
+      "@id": "sdo:produces",
+      "@type": "sdo:Thing"
+    },
+    "uses": {
+      "@id": "sdo:instrument",
+      "@type": "sdo:Thing"
+    },
+    "measures": {
+      "@id": "sdo:variableMeasured",
+      "@type": "sdo:Thing"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

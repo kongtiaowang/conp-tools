@@ -1,0 +1,62 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "DatasetDistribution": "sdo:DataDownload",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "alternateIdentifiers": "sdo:identifier",
+    "relatedIdentifiers": "sdo:identifier",
+    "title": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "storedIn": {
+      "@id": "sdo:includedInDataCatalog",
+      "@type": "sdo:DataCatalog"
+    },
+    "version": "sdo:version",
+    "licenses": "sdo:license",
+    "access": {
+      "@id": "sdo:accessMode",
+      "@type": "sdo:EntryPoint"
+    },
+    "size": {
+      "@id": "sdo:contentSize",
+      "@type": "sdo:Text"
+    },
+    "dates": {
+      "@id": "sdo:temporalCoverage",
+      "@type": "sdo:Text"
+    },
+    "curationStatus": {
+      "@id": "sdo:ratingValue",
+      "@type": "sdo:Text"
+    },
+    "conformsTo": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    },
+    "qualifiers": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    },
+    "formats": {
+      "@id": "sdo:encodingFormat",
+      "@type": "sdo:Text"
+    },
+    "unit": {
+      "@id": "sdo:unitText",
+      "@type": "sdo:Text"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

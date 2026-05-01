@@ -1,0 +1,33 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "DataStandard": "sdo:CreativeWork",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "licenses": "sdo:license",
+    "version": "sdo:version",
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "type": "sdo:Property",
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

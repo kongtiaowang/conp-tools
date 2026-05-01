@@ -1,0 +1,46 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "StudyGroup": "sdo:Thing",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "keywords": {
+      "@id": "sdo:keywords",
+      "@type": "sdo:Thing"
+    },
+    "size": {
+      "@id": "sdo:contentSize",
+      "@type": "sdo:Text"
+    },
+    "members": {
+      "@id": "sdo:member",
+      "@type": "sdo:Thing"
+    },
+    "consentInformation": {
+      "@id": "sdo:permissionType",
+      "@type": "sdo:DigitalDocumentPermissionType"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "transformationFile": {
+      "@id": "sdo:url",
+      "@type": "@id"
+    },
+    "ingestMethod": {
+      "@id": "sdo:procedure",
+      "@type": "sdo:Text"
+    },
+    "ingestTarget": {
+      "@id": "sdo:isBasedOn",
+      "@type": "@id"
+    },
+    "filePattern": {
+      "@id": "sdo:valuePattern",
+      "@type": "sdo:Text"
+    },
+    "ingestTimestamp": {
+      "@id": "sdo:uploadDate",
+      "@type": "sdo:Date"
+    }
+  }
+}

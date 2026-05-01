@@ -1,0 +1,31 @@
+{
+  "@context": {
+    "@language": "en",
+    "obo": "http://purl.obolibrary.org/obo/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "Grant": "obo:OBI_0001636",
+    "identifier": {
+      "@id": "obo:IAO_0000577",
+      "@type": "@id"
+    },
+    "name": {
+      "@id": "obo:IAO_0000590"
+    },
+    "description": {
+      "@id": "obo:IAO_0000300"
+    },
+    "awardee": {
+      "@id" : "obo:ERO_0000023",
+      "@type":["obo:OBI_0000245","obo:NCBITaxon_9606"]
+    },
+    "funds": {
+      "@id" : "obo:ERO_0000023",
+      "@type":["obo:OBI_0000066","obo:IAO_0000100"]
+    },
+    "funders":{
+      "@id": "obo:ERO_0000597",
+      "@type":["obo:OBI_0000245","obo:NCBITaxon_9606"]
+    }
+
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "@context": {
+    "@language": "en",
+    "obo": "http://purl.obolibrary.org/obo/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "DataType": "obo:IAO_0000109",
+    "information" : {
+      "@id": "obo:IAO_0000219",
+      "@type":"obo:IAO_0000109"
+    },
+    "method" : {
+      "@id": "obo:RO_0000059",
+      "@type":"obo:OBI_0000272"
+    },
+    "platform" : {
+      "@id": "obo:RO_0000057",
+      "@type": "obo:OBI_0000968"
+    },
+    "instrument" : {
+      "@id": "obo:RO_0000057",
+      "@type":"obo:OBI_0000968"
+    }
+  }
+}

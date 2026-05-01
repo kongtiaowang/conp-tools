@@ -1,0 +1,18 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "DataType": "sdo:Thing",
+    "information": {
+      "@id": "sdo:Property"
+    },
+    "method": {
+      "@id": "sdo:Property"
+    },
+    "platform": {
+      "@id": "sdo:Property"
+    },
+    "instrument": {
+      "@id": "sdo:instrument"
+    }
+  }
+}

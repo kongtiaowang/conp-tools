@@ -1,0 +1,50 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "DataRepository": "sdo:DataCatalog",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "licenses": "sdo:license",
+    "version": "sdo:version",
+    "publishers": "sdo:publisher",
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "dates": {
+      "@id": "sdo:temporalCoverage",
+      "@type": "sdo:Text"
+    },
+    "scopes": "sdo:identifier",
+    "types": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Thing"
+    },
+    "aggregatorOf": {
+      "@id": "sdo:includedInDataCatalog",
+      "@type": "sdo:DataCatalog"
+    },
+    "access": {
+      "@id": "sdo:accessMode",
+      "@type": "sdo:EntryPoint"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

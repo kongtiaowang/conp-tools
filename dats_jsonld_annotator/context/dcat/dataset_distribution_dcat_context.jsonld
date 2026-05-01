@@ -1,0 +1,12 @@
+{
+  "@context": {
+    "dcat": "http://www.w3.org/ns/dcat#",
+    "dct": "http://purl.org/dc/terms/",
+    "prov": "http://www.w3.org/ns/prov#",
+    "DatasetDistribution": "dcat:Distribution",
+    "identifier": "dct:identifier",
+     "title": "dct:title",
+    "description": "dct:description",
+    "licenses": "dct:license"
+  }
+}

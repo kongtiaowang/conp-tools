@@ -1,0 +1,15 @@
+{
+  "@context": {
+    "obo": "http://purl.obolibrary.org/obo/",
+    "TaxonomicInfo": "obo:NCIT_C17469",
+    "identifier": {
+      "@id": "obo:IAO_0000577",
+      "@type": "@id"
+    },
+    "name": {
+      "@id": "obo:IAO_0000590"
+    },
+    "alternateIdentifiers": "obo:",
+    "relatedIdentifiers": "obo:"
+  }
+}

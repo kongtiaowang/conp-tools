@@ -1,0 +1,6 @@
+{
+  "@context": {
+    "obo": "http://purl.obolibrary.org/obo/",
+    "Access": "obo:OBI_0001551"
+  }
+}

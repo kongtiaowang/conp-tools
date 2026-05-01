@@ -1,0 +1,27 @@
+{
+  "@context": {
+    "@language": "en",
+    "obo": "http://purl.obolibrary.org/obo/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "swo": "http://www.ebi.ac.uk/swo/",
+    "identifier": "obo:IAO_0000577",
+    "alternateIdentifiers": "obo:IAO_0000577",
+    "relatedIdentifiers": "obo:IAO_0000577",
+    "name": {
+      "@id": "obo:IAO_0000590"
+    },
+    "description": {
+      "@id": "obo:IAO_0000300"
+    },
+    "keywords": "obo:IAO_0000629",
+    "version": "obo:IAO_0000129",
+    "unit": {
+      "@id": "obo:IAO_0000039",
+      "@type": "obo:UO_0000000"
+    },
+    "dates": {
+      "@id": "obo:RO_0002537",
+      "@type": "xsd:date"
+    }
+  }
+}

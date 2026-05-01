@@ -1,0 +1,37 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "Publication": "sdo:ScholarlyArticle",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "title": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "type": "sdo:category",
+    "publicationVenue": "sdo:publication",
+    "authorList": "sdo:author",
+    "authors": "sdo:author",
+    "acknowledges": "sdo:funder",
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "dates": {
+      "@id": "sdo:temporalCoverage",
+      "@type": "sdo:Text"
+    },
+    "authorsList": "sdo:author",
+    "licenses": "sdo:license",
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

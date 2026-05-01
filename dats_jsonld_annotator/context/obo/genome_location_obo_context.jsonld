@@ -1,0 +1,16 @@
+{
+  "@context": {
+    "@language": "en",
+    "obo": "http://purl.obolibrary.org/obo/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "faldo": "http://biohackathon.org/resource/faldo#",
+    "GenomeLocation": "faldo:Position",
+    "assembly": "obo:ERO_0000609",
+    "startPosition": "faldo:begin",
+    "endPosition": "faldo:end",
+    "chromosome": "obo:GO_0005694",
+    "strand": "faldo:StrandedPosition"
+  }
+}
+
+

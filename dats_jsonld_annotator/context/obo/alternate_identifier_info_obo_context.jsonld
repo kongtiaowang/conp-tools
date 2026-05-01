@@ -1,0 +1,17 @@
+{
+  "@context": {
+    "@language": "en",
+    "obo": "http://purl.obolibrary.org/obo/",
+    "AlternateIdentifierInfo": "obo:IAO_0000578",
+    "identifier": {
+      "@id": "obo:IAO_0000577",
+      "@type": "@id"
+    },
+    "name": {
+      "@id": "obo:IAO_0000590"
+    },
+    "description": {
+      "@id": "obo:IAO_0000300"
+    }
+  }
+}

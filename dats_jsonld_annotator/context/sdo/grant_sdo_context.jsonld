@@ -1,0 +1,43 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "wsdo": "https://webschemas.org/",
+    "Grant": "wsdo:Grant",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "funds": {
+      "@id": "sdo:fundedItem",
+      "@type": "sdo:Thing"
+    },
+    "funders": {
+      "@id": "sdo:funder",
+      "@type": "sdo:Thing"
+    },
+    "awardees": {
+      "@id": "sdo:endorsee",
+      "@type": "sdo:Thing"
+    },
+    "dates": {
+      "@id": "sdo:temporalCoverage",
+      "@type": "sdo:Text"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

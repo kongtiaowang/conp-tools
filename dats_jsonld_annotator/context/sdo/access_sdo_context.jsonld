@@ -1,0 +1,42 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "Access": "sdo:EntryPoint",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "landingPage": {
+      "@id": "sdo:url",
+      "@type": "sdo:URL"
+    },
+    "accessURL": {
+      "@id": "sdo:url",
+      "@type": "sdo:URL"
+    },
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "types": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Thing"
+    },
+    "authorizations": {
+      "@id": "sdo:permissionType",
+      "@type": "sdo:DigitalDocumentPermissionType"
+    },
+    "authentications": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

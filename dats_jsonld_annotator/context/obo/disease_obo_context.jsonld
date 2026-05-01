@@ -1,0 +1,15 @@
+{
+  "@context": {
+    "@language": "en",
+    "obo": "http://purl.obolibrary.org/obo/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "Disease": "obo:DOID_4",
+    "identifier": {
+      "@id": "obo:IAO_0000577",
+      "@type": "@id"
+    },
+    "name": "obo:IAO_0000590",
+    "description": "obo:IAO_0000300",
+    "diseaseStatus": "obo:NCIT_C93554"
+  }
+}

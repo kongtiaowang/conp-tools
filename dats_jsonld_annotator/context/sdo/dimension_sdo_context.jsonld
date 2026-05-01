@@ -1,0 +1,58 @@
+{
+  "@context": {
+    "sdo": "https://schema.org/",
+    "Dimension": "sdo:Thing",
+    "identifier": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "name": {
+      "@id": "sdo:name",
+      "@type": "sdo:Text"
+    },
+    "description": {
+      "@id": "sdo:description",
+      "@type": "sdo:Text"
+    },
+    "alternateIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "relatedIdentifiers": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Text"
+    },
+    "types": {
+      "@id": "sdo:identifier",
+      "@type": "sdo:Thing"
+    },
+    "datatype": {
+      "@id": "sdo:measuredValue",
+      "@type": "sdo:DataType"
+    },
+    "values": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:Thing"
+    },
+    "unit": {
+      "@id": "sdo:unitText",
+      "@type": "sdo:Text"
+    },
+    "isAbout": {
+      "@id": "sdo:about",
+      "@type": "sdo:Text"
+    },
+    "consentInformation": {
+      "@id": "sdo:permissionType",
+      "@type": "sdo:DigitalDocumentPermissionType"
+    },
+    "partOf": {
+      "@id": "sdo:isPartOf",
+      "@type": "sdo:Thing"
+    },
+    "extraProperties": {
+      "@id": "sdo:additionalProperty",
+      "@type": "sdo:PropertyValue"
+    }
+  }
+}

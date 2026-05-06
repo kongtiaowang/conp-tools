@@ -8,12 +8,14 @@ import subprocess
 import urllib.request
 from typing import List, Dict, Any
 
+# 定义需要直接保存为普通文件的后缀
 TEXT_EXTENSIONS = {'.csv', '.json', '.md', '.txt', '.py', '.yml', '.yaml'}
 
 def run(cmd: list[str], cwd: str | None = None):
     subprocess.run(cmd, cwd=cwd, check=True)
 
 def clean_title(title: str) -> str:
+    """标题安全化，限制在 80 字符"""
     clean = re.sub(r'[<>:"/\\|?*]', '_', title)
     clean = re.sub(r'\s+', '_', clean)
     clean = re.sub(r'_+', '_', clean)
@@ -22,20 +24,36 @@ def clean_title(title: str) -> str:
         clean = clean[:80].strip('_')
     return clean
 
+def html_to_text(value: str) -> str:
+    if not value: return ""
+    text = re.sub(r"<br\s*/?>", "\n", value, flags=re.IGNORECASE)
+    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+    return text.strip()
+
+def natural_size(num_bytes: int) -> tuple[float, str]:
+    units = ["Bytes", "KB", "MB", "GB", "TB", "PB"]
+    size = float(num_bytes)
+    unit = units[0]
+    for u in units:
+        unit = u
+        if size < 1024:
+            break
+        size /= 1024
+    return (round(size, 2), unit)
+
 def download_file_to_disk(url: str, dest_path: str, token: str | None = None):
+    """将文件直接下载到本地磁盘"""
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=300) as response, open(dest_path, "wb") as out_file:
         out_file.write(response.read())
 
 def configure_git_attributes(dataset_dir: str):
-    """
-    配置 .gitattributes。
-    使用 'expression' 语法：(anything) 表示匹配，'nothing' 表示不匹配。
-    """
+    """配置 .gitattributes 确保文本文件不进 Annex"""
     attr_path = os.path.join(dataset_dir, ".gitattributes")
-    # 修正语法：annex.largefiles 后面跟的是表达式
-    # 'nothing' 是 git-annex 识别的合法表达式，表示没有任何文件属于大文件
+    # 使用 nothing 语法修复之前的 Parse error
     patterns = [
         "README.md annex.largefiles=nothing",
         "DATS.json annex.largefiles=nothing",
@@ -47,23 +65,54 @@ def configure_git_attributes(dataset_dir: str):
     ]
     with open(attr_path, "w") as f:
         f.write("\n".join(patterns) + "\n")
-    # 先用 git add 保护这个属性文件
     run(["git", "add", ".gitattributes"], cwd=dataset_dir)
+
+def generate_readme(record: dict, total_size: float, size_unit: str) -> str:
+    metadata = record.get("metadata", {})
+    return f"""# {metadata.get('title')}
+
+## Description
+{html_to_text(metadata.get('description', 'No description provided.'))}
+
+## Metadata
+- **Zenodo Record ID**: {record.get('id')}
+- **DOI**: {metadata.get('doi', 'N/A')}
+- **Total Size**: {total_size} {size_unit}
+- **Keywords**: {", ".join(metadata.get('keywords', []))}
+
+---
+*Automatically imported via CONP-Zenodo-Crawler*
+"""
+
+def generate_dats_json(record: dict, total_size: float, size_unit: str) -> dict:
+    metadata = record.get("metadata", {})
+    return {
+        "title": metadata.get("title"),
+        "description": html_to_text(metadata.get("description")),
+        "creators": [{"name": c.get("name")} for c in metadata.get("creators", [])],
+        "version": metadata.get("version", "1.0.0"),
+        "distributions": [{
+            "size": total_size,
+            "unit": {"value": size_unit},
+            "access": {"landingPage": f"https://zenodo.org/record/{record.get('id')}"}
+        }],
+        "extraProperties": [
+            {"category": "source", "values": [{"value": "zenodo"}]},
+            {"category": "zenodo_record_id", "values": [{"value": str(record.get('id'))}]}
+        ]
+    }
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--record", required=True)
     parser.add_argument("--basedir", default=".")
-    parser.add_argument("--config", default=os.path.expanduser("~/.conp_crawler_config.json"))
     parser.add_argument("--zenodo-token")
     args = parser.parse_args()
 
     record_id = args.record.split("/")[-1]
-    # 尝试多种方式获取 token
-    token = os.getenv("ZENODO_TOKEN") or os.getenv("DATALAD_ZENODO_token")
-    
+    token = args.zenodo_token or os.getenv("ZENODO_TOKEN") or os.getenv("DATALAD_ZENODO_token")
+
     print(f"📥 Fetching Zenodo record {record_id}...")
-    # 这里直接用简洁的获取方式
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     req = urllib.request.Request(f"https://zenodo.org/api/records/{record_id}", headers=headers)
     with urllib.request.urlopen(req) as r:
@@ -79,6 +128,14 @@ def main():
     configure_git_attributes(dataset_dir)
 
     files = record.get("files", [])
+    total_bytes = sum([int(f.get("size", 0)) for f in files])
+    total_size, size_unit = natural_size(total_bytes)
+
+    # 跟踪是否已经处理了元数据文件
+    has_readme = False
+    has_dats = False
+
+    print(f"🔗 Processing {len(files)} files...")
     for f_item in files:
         name = f_item["key"]
         url = f_item["links"]["self"]
@@ -86,19 +143,37 @@ def main():
         dest = os.path.join(dataset_dir, name)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
 
+        if name.lower() == "readme.md": has_readme = True
+        if name.lower() == "dats.json": has_dats = True
+
         if ext in TEXT_EXTENSIONS:
             print(f"   📄 [TEXT] Downloading: {name}")
             download_file_to_disk(url, dest, token)
-            # 使用普通的 git add
             run(["git", "add", name], cwd=dataset_dir)
         else:
             print(f"   📦 [LARGE] Adding Link: {name}")
-            # 使用 relaxed 模式注册大文件
             run(["git", "annex", "addurl", url, "--fast", "--relaxed", "--file", name], cwd=dataset_dir)
 
+    # --- 自动生成缺失的标准文件 ---
+    if not has_readme:
+        print("📝 Generating standard README.md...")
+        with open(os.path.join(dataset_dir, "README.md"), "w", encoding="utf-8") as f:
+            f.write(generate_readme(record, total_size, size_unit))
+        run(["git", "add", "README.md"], cwd=dataset_dir)
+
+    if not has_dats:
+        print("📝 Generating standard DATS.json...")
+        with open(os.path.join(dataset_dir, "DATS.json"), "w", encoding="utf-8") as f:
+            json.dump(generate_dats_json(record, total_size, size_unit), f, indent=4, ensure_ascii=False)
+        run(["git", "add", "DATS.json"], cwd=dataset_dir)
+
+    # 生成爬虫记录文件
+    with open(os.path.join(dataset_dir, ".conp-zenodo-crawler.json"), "w") as f:
+        json.dump({"record_id": record_id, "import_date": dt.datetime.now().isoformat()}, f, indent=4)
+    run(["git", "add", ".conp-zenodo-crawler.json"], cwd=dataset_dir)
+
     print("💾 Saving dataset state...")
-    # 保存时，DataLad 会遵循 .gitattributes 的规则
-    run(["datalad", "save", "-m", f"Import Zenodo {record_id} with mixed storage mode"], cwd=dataset_dir)
+    run(["datalad", "save", "-m", f"Import Zenodo {record_id} with standardized metadata and mixed storage"], cwd=dataset_dir)
     print(f"\n✅ Success! Dataset ready at {dataset_dir}")
 
 if __name__ == "__main__":

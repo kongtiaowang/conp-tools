@@ -15,13 +15,13 @@ def run(cmd: list[str], cwd: str | None = None):
     subprocess.run(cmd, cwd=cwd, check=True)
 
 def clean_title(title: str) -> str:
-    """标题安全化，限制在 80 字符"""
+    """标题安全化，限制在 150 字符"""
     clean = re.sub(r'[<>:"/\\|?*]', '_', title)
     clean = re.sub(r'\s+', '_', clean)
     clean = re.sub(r'_+', '_', clean)
     clean = clean.strip('_')
-    if len(clean) > 80:
-        clean = clean[:80].strip('_')
+    if len(clean) > 150:
+        clean = clean[:150].strip('_')
     return clean
 
 def html_to_text(value: str) -> str:
@@ -119,7 +119,8 @@ def main():
         record = json.loads(r.read().decode())
     
     title = record.get("metadata", {}).get("title", f"Record_{record_id}")
-    dataset_dir = os.path.abspath(os.path.join(args.basedir, "projects", clean_title(title)))
+    folder_name = f"conp-dataset-{clean_title(title)}"
+    dataset_dir = os.path.abspath(os.path.join(args.basedir, "projects", folder_name))
     print(f"📂 Preparing directory: {dataset_dir}")
     os.makedirs(dataset_dir, exist_ok=True)
 

@@ -49,18 +49,23 @@ def find_dataset_dir(basedir: str, record_id: str) -> Optional[str]:
 
 def get_repo_name(folder_name: str) -> str:
     """
-    Generate a repository name from the folder name.
-    It strips parentheses, sanitizes unsafe characters (e.g., &, spaces, commas), and truncates to a safe length (120 chars).
+    Generate a GitHub repository name from the folder name.
+    Always adds 'conp-dataset-' prefix for the GitHub repo.
+    Sanitizes unsafe characters and truncates to 80 chars.
     """
+    # Strip any existing conp-dataset- prefix first to avoid double-prefixing
+    name = folder_name.removeprefix("conp-dataset-")
     # Remove everything after the first parenthesis if present
-    name = folder_name.split('(')[0].strip('_')
+    name = name.split('(')[0].strip('_')
     # Replace problematic characters with safe alternatives
     name = name.replace('&', 'and')
     name = name.replace(',', '')
     name = name.replace(' ', '_')
     # Collapse multiple underscores
     name = re.sub(r'_+', '_', name)
-    # Truncate to a reasonable length (120 chars) to keep more of the title
+    # Add the conp-dataset- prefix for GitHub repo name
+    name = f"conp-dataset-{name}"
+    # Truncate to a reasonable length
     if len(name) > 80:
         name = name[:80].strip('_')
     return name
@@ -212,11 +217,11 @@ def main():
         branch_result = run(["git", "symbolic-ref", "--short", "HEAD"], cwd=dataset_dir, capture_output=True)
         current_branch = branch_result.stdout.strip()
         print(f"🚀 Pushing {current_branch} branch...")
-        run(["git", "push", "-u", "origin", current_branch], cwd=dataset_dir)
+        run(["git", "push", "-u", "--force", "origin", current_branch], cwd=dataset_dir)
         
         print("🚀 Pushing git-annex branch...")
         try:
-            run(["git", "push", "origin", "git-annex"], cwd=dataset_dir)
+            run(["git", "push", "--force", "origin", "git-annex"], cwd=dataset_dir)
         except subprocess.CalledProcessError:
             print("⚠️  Warning: git-annex branch push failed (it might not exist if no large files were added).")
 

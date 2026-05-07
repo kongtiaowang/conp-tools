@@ -119,7 +119,7 @@ def main():
         record = json.loads(r.read().decode())
     
     title = record.get("metadata", {}).get("title", f"Record_{record_id}")
-    folder_name = f"conp-dataset-{clean_title(title)}"
+    folder_name = clean_title(title)
     dataset_dir = os.path.abspath(os.path.join(args.basedir, "projects", folder_name))
     print(f"📂 Preparing directory: {dataset_dir}")
     os.makedirs(dataset_dir, exist_ok=True)

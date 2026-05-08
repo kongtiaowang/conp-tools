@@ -35,16 +35,19 @@ def find_dataset_dir(basedir: str, record_id: str) -> Optional[str]:
         if not os.path.isdir(folder_path):
             continue
             
-        # Check for crawler config file
-        config_path = os.path.join(folder_path, ".conp-zenodo-crawler.json")
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
-                    if str(config.get("record_id")) == str(record_id):
-                        return folder_path
-            except:
-                pass
+        # 支持多种爬虫配置文件 (Zenodo, OSF)
+        for config_name in [".conp-zenodo-crawler.json", ".conp-osf-crawler.json"]:
+            config_path = os.path.join(folder_path, config_name)
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                        # 兼容 Zenodo 的 record_id 和 OSF 的 node_id
+                        stored_id = config.get("record_id") or config.get("node_id")
+                        if str(stored_id) == str(record_id):
+                            return folder_path
+                except:
+                    pass
     return None
 
 def get_repo_name(folder_name: str) -> str:
@@ -171,11 +174,16 @@ def main():
 
     record_id = args.record.split("/")[-1]
     
-    print(f"🔍 Searching for dataset with record ID: {record_id}...")
-    dataset_dir = find_dataset_dir(args.basedir, record_id)
+    # 🌟 改进：如果指定了 main_repo 但没指定 basedir，自动使用 main_repo 寻找数据集
+    search_dir = args.basedir
+    if args.main_repo and args.basedir == ".":
+        search_dir = args.main_repo
+        
+    print(f"🔍 Searching for dataset with record ID: {record_id} in {search_dir}/projects...")
+    dataset_dir = find_dataset_dir(search_dir, record_id)
     
     if not dataset_dir:
-        print(f"❌ Error: Could not find dataset directory for record {record_id} in {args.basedir}/projects")
+        print(f"❌ Error: Could not find dataset directory for record {record_id} in {search_dir}/projects")
         return
 
     folder_name = os.path.basename(dataset_dir)

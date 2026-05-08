@@ -9,19 +9,25 @@ import urllib.request
 from typing import List, Dict, Any
 
 # 定义需要直接保存为普通文件的后缀
-TEXT_EXTENSIONS = {'.csv', '.json', '.md', '.txt', '.py', '.yml', '.yaml'}
+TEXT_EXTENSIONS = {'.csv', '.json', '.md', '.txt', '.py', '.yml', '.yaml', '.tsv', '.jsonld', '.html'}
+TEXT_FILENAMES = {'README', 'LICENSE', 'CHANGES', 'AUTHORS', 'MANIFEST', 'DESCRIPTION'}
+
+def is_text_file(filename: str) -> bool:
+    ext = os.path.splitext(filename)[1].lower()
+    base = os.path.basename(filename).upper()
+    return ext in TEXT_EXTENSIONS or base in TEXT_FILENAMES
 
 def run(cmd: list[str], cwd: str | None = None):
     subprocess.run(cmd, cwd=cwd, check=True)
 
 def clean_title(title: str) -> str:
-    """标题安全化，限制在 150 字符"""
+    """标题安全化，限制在 80 字符"""
     clean = re.sub(r'[<>:"/\\|?*]', '_', title)
     clean = re.sub(r'\s+', '_', clean)
     clean = re.sub(r'_+', '_', clean)
     clean = clean.strip('_')
-    if len(clean) > 150:
-        clean = clean[:150].strip('_')
+    if len(clean) > 80:
+        clean = clean[:80].strip('_')
     return clean
 
 def html_to_text(value: str) -> str:
@@ -147,7 +153,7 @@ def main():
         if name.lower() == "readme.md": has_readme = True
         if name.lower() == "dats.json": has_dats = True
 
-        if ext in TEXT_EXTENSIONS:
+        if is_text_file(name):
             print(f"   📄 [TEXT] Downloading: {name}")
             download_file_to_disk(url, dest, token)
             run(["git", "add", name], cwd=dataset_dir)

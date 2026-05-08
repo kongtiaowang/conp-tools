@@ -90,7 +90,7 @@ def generate_readme(record: dict, total_size: float, size_unit: str) -> str:
 *Automatically imported via CONP-Zenodo-Crawler*
 """
 
-def generate_dats_json(record: dict, total_size: float, size_unit: str) -> dict:
+def generate_dats_json(record: dict, total_size: float, size_unit: str, file_count: int) -> dict:
     metadata = record.get("metadata", {})
     return {
         "title": metadata.get("title"),
@@ -108,7 +108,10 @@ def generate_dats_json(record: dict, total_size: float, size_unit: str) -> dict:
         }],
         "extraProperties": [
             {"category": "source", "values": [{"value": "zenodo"}]},
-            {"category": "zenodo_record_id", "values": [{"value": str(record.get('id'))}]}
+            {"category": "zenodo_record_id", "values": [{"value": str(record.get('id'))}]},
+            {"category": "files", "values": [{"value": str(file_count)}]},
+            {"category": "subjects", "values": [{"value": "N/A"}]},
+            {"category": "CONP_status", "values": [{"value": "CONP"}]}
         ]
     }
 
@@ -175,7 +178,7 @@ def main():
     if not has_dats:
         print("📝 Generating standard DATS.json...")
         with open(os.path.join(dataset_dir, "DATS.json"), "w", encoding="utf-8") as f:
-            json.dump(generate_dats_json(record, total_size, size_unit), f, indent=4, ensure_ascii=False)
+            json.dump(generate_dats_json(record, total_size, size_unit, len(file_urls)), f, indent=4, ensure_ascii=False)
         run(["git", "add", "DATS.json"], cwd=dataset_dir)
 
     # 生成爬虫记录文件

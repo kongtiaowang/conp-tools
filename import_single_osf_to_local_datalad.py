@@ -213,7 +213,7 @@ def generate_readme(dataset: dict, total_size: float, size_unit: str) -> str:
     content += "\n\n---\n*Automatically imported via CONP-OSF-Crawler*"
     return content
 
-def generate_dats_json(dataset: dict, total_size: float, size_unit: str) -> dict:
+def generate_dats_json(dataset: dict, total_size: float, size_unit: str, file_count: int) -> dict:
     return {
         "title": dataset["title"],
         "description": html_to_text(dataset.get("description", "")),
@@ -230,7 +230,10 @@ def generate_dats_json(dataset: dict, total_size: float, size_unit: str) -> dict
         }],
         "extraProperties": dataset.get("extraProperties", []) + [
             {"category": "source", "values": [{"value": "osf"}]},
-            {"category": "osf_node_id", "values": [{"value": dataset["node_id"]}]}
+            {"category": "osf_node_id", "values": [{"value": dataset["node_id"]}]},
+            {"category": "files", "values": [{"value": str(file_count)}]},
+            {"category": "subjects", "values": [{"value": "N/A"}]},
+            {"category": "CONP_status", "values": [{"value": "CONP"}]}
         ]
     }
 
@@ -295,7 +298,7 @@ def main():
         f.write(generate_readme(dataset, total_size, size_unit))
     
     with open(os.path.join(dataset_dir, "DATS.json"), "w", encoding="utf-8") as f:
-        json.dump(generate_dats_json(dataset, total_size, size_unit), f, indent=4, ensure_ascii=False)
+        json.dump(generate_dats_json(dataset, total_size, size_unit, len(file_sizes)), f, indent=4, ensure_ascii=False)
 
     with open(os.path.join(dataset_dir, ".conp-osf-crawler.json"), "w") as f:
         json.dump({"node_id": node_id, "version": dataset["version"]}, f, indent=4)

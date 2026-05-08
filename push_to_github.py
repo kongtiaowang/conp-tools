@@ -94,27 +94,41 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
         print(f"Would run: gh pr create --repo CONP-PCNO/conp-dataset --base master --head {org}:{branch_name} ...")
         return
 
+    # --- 自动修复：清理已知会导致 Git 崩溃的损坏子模块路径 ---
+    broken_paths = ["projects/cneuromod_processed"]
+    for bp in broken_paths:
+        bp_path = os.path.join(main_repo_path, bp)
+        if os.path.lexists(bp_path):
+            print(f"🧹 Cleanup: Removing corrupted submodule path to prevent Git crash: {bp}")
+            try:
+                if os.path.isdir(bp_path) and not os.path.islink(bp_path):
+                    import shutil
+                    shutil.rmtree(bp_path)
+                else:
+                    os.remove(bp_path)
+            except Exception as e:
+                print(f"⚠️  Could not remove {bp}: {e}")
+
     # Ensure the main repository is up‑to‑date with upstream (or origin) before branching
     print("🔄 Syncing main repository with upstream/master ...")
     # If an upstream remote exists, fetch from it; otherwise fetch from origin
     try:
         run(["git", "remote", "get-url", "upstream"], cwd=main_repo_path)
-        upstream_exists = True
+        upstream_remote = "upstream"
     except subprocess.CalledProcessError:
-        upstream_exists = False
-    if upstream_exists:
-        run(["git", "fetch", "upstream"], cwd=main_repo_path)
-        run(["git", "checkout", "master"], cwd=main_repo_path)
-        run(["git", "reset", "--hard", "upstream/master"], cwd=main_repo_path)
-    else:
-        # Fallback: pull from origin master
-        run(["git", "checkout", "master"], cwd=main_repo_path)
-        run(["git", "pull", "origin", "master"], cwd=main_repo_path)
+        upstream_remote = "origin"
+    
+    run(["git", "fetch", upstream_remote], cwd=main_repo_path)
 
-    # 0. Create & switch to the new branch (based on the freshly synced master)
-    print(f"🌿 Creating branch {branch_name} ...")
+    # 1. Start from a clean master
+    print(f"🔄 Syncing main repository with {upstream_remote}/master ...")
+    run(["git", "checkout", "--no-recurse-submodules", "master"], cwd=main_repo_path)
+    run(["git", "reset", "--hard", f"{upstream_remote}/master"], cwd=main_repo_path)
+    
+    # 2. Create or reset the dataset branch
+    print(f"🌿 Switching to branch {branch_name}...")
     try:
-        run(["git", "checkout", "-b", branch_name], cwd=main_repo_path)
+        run(["git", "checkout", "--no-recurse-submodules", "-B", branch_name], cwd=main_repo_path)
     except subprocess.CalledProcessError:
         # If the branch already exists, just checkout it
         print(f"⚠️ Branch {branch_name} already exists, checking out ...")

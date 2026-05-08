@@ -178,7 +178,7 @@ def main():
     if not has_dats:
         print("📝 Generating standard DATS.json...")
         with open(os.path.join(dataset_dir, "DATS.json"), "w", encoding="utf-8") as f:
-            json.dump(generate_dats_json(record, total_size, size_unit, len(file_urls)), f, indent=4, ensure_ascii=False)
+            json.dump(generate_dats_json(record, total_size, size_unit, len(files)), f, indent=4, ensure_ascii=False)
         run(["git", "add", "DATS.json"], cwd=dataset_dir)
 
     # 生成爬虫记录文件

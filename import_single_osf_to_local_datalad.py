@@ -218,11 +218,15 @@ def generate_dats_json(dataset: dict, total_size: float, size_unit: str) -> dict
         "title": dataset["title"],
         "description": html_to_text(dataset.get("description", "")),
         "creators": dataset.get("creators", []),
-        "version": dataset.get("version"),
+        "version": dataset.get("version", "1.0.0"),
+        "types": [{"information": {"value": "dataset"}}],
+        "licenses": dataset.get("licenses", [{"name": "None"}]),
+        "keywords": dataset.get("keywords", [{"value": "N/A"}]),
         "distributions": [{
             "size": total_size,
             "unit": {"value": size_unit},
-            "access": {"landingPage": dataset["homepage"]}
+            "access": {"landingPage": dataset["homepage"]},
+            "formats": ["N/A"]
         }],
         "extraProperties": dataset.get("extraProperties", []) + [
             {"category": "source", "values": [{"value": "osf"}]},

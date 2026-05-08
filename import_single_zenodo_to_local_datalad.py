@@ -97,10 +97,14 @@ def generate_dats_json(record: dict, total_size: float, size_unit: str) -> dict:
         "description": html_to_text(metadata.get("description")),
         "creators": [{"name": c.get("name")} for c in metadata.get("creators", [])],
         "version": metadata.get("version", "1.0.0"),
+        "types": [{"information": {"value": "dataset"}}],
+        "licenses": [{"name": metadata.get("license", "None")}],
+        "keywords": [{"value": k} for k in metadata.get("keywords", [])] if metadata.get("keywords") else [{"value": "N/A"}],
         "distributions": [{
             "size": total_size,
             "unit": {"value": size_unit},
-            "access": {"landingPage": f"https://zenodo.org/record/{record.get('id')}"}
+            "access": {"landingPage": f"https://zenodo.org/record/{record.get('id')}"},
+            "formats": ["N/A"]
         }],
         "extraProperties": [
             {"category": "source", "values": [{"value": "zenodo"}]},

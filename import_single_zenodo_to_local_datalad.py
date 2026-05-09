@@ -21,8 +21,9 @@ def run(cmd: list[str], cwd: str | None = None):
     subprocess.run(cmd, cwd=cwd, check=True)
 
 def clean_title(title: str) -> str:
-    """标题安全化，限制在 80 字符"""
-    clean = re.sub(r'[<>:"/\\|?*]', '_', title)
+    """标题安全化，限制在 80 字符，并移除 Shell 不安全字符"""
+    clean = title.replace('&', 'and')
+    clean = re.sub(r'[<>:"/\\|?*(),]', '_', clean)
     clean = re.sub(r'\s+', '_', clean)
     clean = re.sub(r'_+', '_', clean)
     clean = clean.strip('_')
@@ -162,6 +163,9 @@ def main():
 
         if is_text_file(name):
             print(f"   📄 [TEXT] Downloading: {name}")
+            # 🌟 修复：如果文件已存在（可能是 Annex 链接），先删除它，否则 open() 会报错
+            if os.path.lexists(dest):
+                os.remove(dest)
             download_file_to_disk(url, dest, token)
             run(["git", "add", name], cwd=dataset_dir)
         else:
@@ -175,11 +179,49 @@ def main():
             f.write(generate_readme(record, total_size, size_unit))
         run(["git", "add", "README.md"], cwd=dataset_dir)
 
-    if not has_dats:
+    # --- 处理 DATS.json (补全缺失字段) ---
+    dats_path = os.path.join(dataset_dir, "DATS.json")
+    perfect_dats = generate_dats_json(record, total_size, size_unit, len(files))
+    
+    if os.path.exists(dats_path):
+        print("📝 Existing DATS.json found, filling in missing mandatory fields...")
+        try:
+            with open(dats_path, 'r', encoding="utf-8") as f:
+                final_dats = json.load(f)
+            
+            # 补全顶层字段
+            for key in ["types", "licenses", "keywords", "version"]:
+                if key not in final_dats or not final_dats[key]:
+                    final_dats[key] = perfect_dats[key]
+            
+            # 补全 distributions.formats
+            if "distributions" in final_dats and final_dats["distributions"]:
+                for dist in final_dats["distributions"]:
+                    if "formats" not in dist:
+                        dist["formats"] = ["N/A"]
+            else:
+                final_dats["distributions"] = perfect_dats["distributions"]
+                
+            # 补全 extraProperties
+            existing_props = final_dats.get("extraProperties", [])
+            existing_cats = {p["category"] for p in existing_props if "category" in p}
+            for p in perfect_dats["extraProperties"]:
+                if p["category"] not in existing_cats:
+                    existing_props.append(p)
+            final_dats["extraProperties"] = existing_props
+        except Exception as e:
+            print(f"⚠️  Error reading existing DATS.json ({e}), using generated one.")
+            final_dats = perfect_dats
+    else:
         print("📝 Generating standard DATS.json...")
-        with open(os.path.join(dataset_dir, "DATS.json"), "w", encoding="utf-8") as f:
-            json.dump(generate_dats_json(record, total_size, size_unit, len(files)), f, indent=4, ensure_ascii=False)
-        run(["git", "add", "DATS.json"], cwd=dataset_dir)
+        final_dats = perfect_dats
+
+    if os.path.lexists(dats_path):
+        os.remove(dats_path)
+        
+    with open(dats_path, "w", encoding="utf-8") as f:
+        json.dump(final_dats, f, indent=4, ensure_ascii=False)
+    run(["git", "add", "DATS.json"], cwd=dataset_dir)
 
     # 生成爬虫记录文件
     with open(os.path.join(dataset_dir, ".conp-zenodo-crawler.json"), "w") as f:

@@ -115,7 +115,7 @@ def fetch_zenodo_remote() -> dict:
                 concept_id = metadata.get('conceptrecid')
                 if concept_id:
                     remote[concept_id] = {
-                        'version': metadata.get('version', 'unknown'),
+                        'version': metadata.get('version') or record.get('updated', ''),
                         'title': metadata.get('title', ''),
                         'url': f"https://zenodo.org/record/{record.get('id')}",
                         'updated': record.get('updated', '')

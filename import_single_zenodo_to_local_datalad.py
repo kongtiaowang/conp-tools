@@ -228,7 +228,8 @@ def main():
     tracker = {
         "record_id": record_id,
         "concept_id": metadata.get("conceptrecid"),
-        "version": metadata.get("version", "1.0.0"),
+        "title": metadata.get("title", ""),
+        "version": metadata.get("version") or record.get("updated", ""),
         "import_date": dt.datetime.now().isoformat(),
     }
     with open(os.path.join(dataset_dir, ".conp-zenodo-crawler.json"), "w") as f:

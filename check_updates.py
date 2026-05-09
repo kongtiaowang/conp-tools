@@ -60,6 +60,7 @@ def get_local_projects_info(projects_dir: str) -> dict:
                         'type': 'osf',
                         'folder': folder,
                         'title': tracker.get('title', folder),
+                        'node_id': tracker.get('node_id'),
                         'version': tracker.get('version', 'unknown')
                     }
             except:
@@ -252,11 +253,14 @@ def main():
     # OSF updates (match by title)
     osf_remote_by_title = {v['title']: k for k, v in osf_remote.items()}
     for project in osf_local:
+        node_id = project.get('node_id')
         local_version = project.get('version', 'unknown')
-        local_title = project.get('title', '')
 
-        if local_title in osf_remote_by_title:
-            node_id = osf_remote_by_title[local_title]
+        if not node_id:
+            print(f"   WARNING: Skipping OSF project '{project['folder']}': no node_id in tracker")
+            continue
+
+        if node_id in osf_remote:
             remote = osf_remote[node_id]
             remote_version = remote.get('version', '')
 

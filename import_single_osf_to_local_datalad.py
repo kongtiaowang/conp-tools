@@ -341,10 +341,16 @@ def main():
         json.dump(final_dats, f, indent=4, ensure_ascii=False)
     run(["git", "add", "DATS.json"], cwd=dataset_dir)
 
+    # 生成爬虫记录文件
+    tracker = {
+        "node_id": node_id,
+        "title": attributes.get("title", ""),
+        "version": attributes.get("date_modified", ""),
+        "import_date": dt.datetime.now().isoformat(),
+    }
     with open(os.path.join(dataset_dir, ".conp-osf-crawler.json"), "w") as f:
-        json.dump({"node_id": node_id, "version": dataset["version"]}, f, indent=4)
-
-    run(["git", "add", "README.md", "DATS.json", ".conp-osf-crawler.json"], cwd=dataset_dir)
+        json.dump(tracker, f, indent=4)
+    run(["git", "add", ".conp-osf-crawler.json"], cwd=dataset_dir)
     print("💾 Saving dataset state...")
     run(["datalad", "save", "-m", f"Import OSF node {node_id} with mixed storage"], cwd=dataset_dir)
     

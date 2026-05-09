@@ -224,8 +224,15 @@ def main():
     run(["git", "add", "DATS.json"], cwd=dataset_dir)
 
     # 生成爬虫记录文件
+    metadata = record.get("metadata", {})
+    tracker = {
+        "record_id": record_id,
+        "concept_id": metadata.get("conceptrecid"),
+        "version": metadata.get("version", "1.0.0"),
+        "import_date": dt.datetime.now().isoformat(),
+    }
     with open(os.path.join(dataset_dir, ".conp-zenodo-crawler.json"), "w") as f:
-        json.dump({"record_id": record_id, "import_date": dt.datetime.now().isoformat()}, f, indent=4)
+        json.dump(tracker, f, indent=4)
     run(["git", "add", ".conp-zenodo-crawler.json"], cwd=dataset_dir)
 
     print("💾 Saving dataset state...")

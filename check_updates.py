@@ -44,8 +44,8 @@ def get_local_projects_info(projects_dir: str) -> dict:
                         'type': 'zenodo',
                         'folder': folder,
                         'title': tracker.get('title', folder),
-                        'concept_doi': tracker.get('zenodo', {}).get('concept_doi'),
-                        'version': tracker.get('zenodo', {}).get('version', 'unknown')
+                        'concept_id': tracker.get('concept_id'),
+                        'version': tracker.get('version', 'unknown')
                     }
             except:
                 pass
@@ -60,7 +60,6 @@ def get_local_projects_info(projects_dir: str) -> dict:
                         'type': 'osf',
                         'folder': folder,
                         'title': tracker.get('title', folder),
-                        'node_id': tracker.get('node_id'),
                         'version': tracker.get('version', 'unknown')
                     }
             except:
@@ -227,11 +226,15 @@ def main():
 
     # Zenodo updates
     for project in zenodo_local:
-        concept_doi = project.get('concept_doi')
+        concept_id = project.get('concept_id')
         local_version = project.get('version', 'unknown')
 
-        if concept_doi and concept_doi in zenodo_remote:
-            remote = zenodo_remote[concept_doi]
+        if not concept_id:
+            print(f"   WARNING: Skipping Zenodo project '{project['folder']}': no concept_id in tracker")
+            continue
+
+        if concept_id in zenodo_remote:
+            remote = zenodo_remote[concept_id]
             remote_version = remote.get('version', 'unknown')
 
             if local_version != remote_version:
@@ -241,21 +244,19 @@ def main():
                     'source': 'zenodo',
                     'local_version': local_version,
                     'remote_version': remote_version,
-                    'concept_doi': concept_doi,
+                    'concept_id': concept_id,
                     'url': remote['url'],
                     'updated': remote['updated']
                 })
 
-    # OSF updates (match by node_id)
+    # OSF updates (match by title)
+    osf_remote_by_title = {v['title']: k for k, v in osf_remote.items()}
     for project in osf_local:
         local_version = project.get('version', 'unknown')
-        node_id = project.get('node_id')
+        local_title = project.get('title', '')
 
-        if not node_id:
-            print(f"   WARNING: Skipping OSF project '{project['folder']}': no node_id in tracker")
-            continue
-
-        if node_id in osf_remote:
+        if local_title in osf_remote_by_title:
+            node_id = osf_remote_by_title[local_title]
             remote = osf_remote[node_id]
             remote_version = remote.get('version', '')
 
@@ -284,7 +285,7 @@ def main():
             print(f"    Version:      {u['local_version']} → {u['remote_version']}")
             print(f"    URL:          {u['url']}")
             if u['source'] == 'zenodo':
-                print(f"    Concept DOI:  {u['concept_doi']}")
+                print(f"    Concept ID:   {u['concept_id']}")
             else:
                 print(f"    Node ID:      {u['node_id']}")
             print(f"    Last updated: {u['updated'][:19] if u['updated'] else 'N/A'}")

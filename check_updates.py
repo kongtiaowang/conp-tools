@@ -60,6 +60,7 @@ def get_local_projects_info(projects_dir: str) -> dict:
                         'type': 'osf',
                         'folder': folder,
                         'title': tracker.get('title', folder),
+                        'node_id': tracker.get('node_id'),
                         'version': tracker.get('version', 'unknown')
                     }
             except:
@@ -245,14 +246,16 @@ def main():
                     'updated': remote['updated']
                 })
 
-    # OSF updates (match by title)
-    osf_remote_by_title = {v['title']: k for k, v in osf_remote.items()}
+    # OSF updates (match by node_id)
     for project in osf_local:
         local_version = project.get('version', 'unknown')
-        local_title = project.get('title', '')
+        node_id = project.get('node_id')
 
-        if local_title in osf_remote_by_title:
-            node_id = osf_remote_by_title[local_title]
+        if not node_id:
+            print(f"   WARNING: Skipping OSF project '{project['folder']}': no node_id in tracker")
+            continue
+
+        if node_id in osf_remote:
             remote = osf_remote[node_id]
             remote_version = remote.get('version', '')
 
@@ -294,6 +297,33 @@ def main():
     print(f"    Tracked projects: {len(zenodo_local) + len(osf_local)}")
     print(f"    Need update:      {len(updates)}")
     print(f"    Up to date:       {len(zenodo_local) + len(osf_local) - len(updates)}")
+
+    # 5. Save report
+    if updates:
+        log_dir = os.path.join(conp_dataset_path, 'log')
+        save_update_report(updates, log_dir)
+
+
+def save_update_report(updates, log_dir):
+    """保存更新报告"""
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    report_file = os.path.join(log_dir, f"dataset_updates_{timestamp}.json")
+    
+    report = {
+        'timestamp': datetime.now().isoformat(),
+        'summary': {
+            'need_update': len(updates)
+        },
+        'new_datasets': updates  # 保持 key 为 new_datasets 方便 pipeline 统一读取
+    }
+    
+    with open(report_file, 'w', encoding='utf-8') as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+    
+    print(f"\n✓ 更新报告已保存: {report_file}")
 
 
 if __name__ == "__main__":

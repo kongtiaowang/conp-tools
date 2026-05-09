@@ -116,24 +116,36 @@ def print_status(state: dict):
 
 # ── Step 1: Check ─────────────────────────────────────────────────────────────
 
-def check_new_datasets(scripts_dir: str, conp_path: str) -> list:
+def check_new_datasets(scripts_dir: str, conp_path: str, run_updates: bool = True) -> list:
+    datasets = []
+    
+    # 1. 检查新发现的数据集
     log("Step 1/3 — 检查新数据集 (check_new_datasets.py)...", "run")
     check_script = os.path.join(scripts_dir, "check_new_datasets.py")
-    result = subprocess.run([sys.executable, check_script], text=True)
-    if result.returncode != 0:
-        log("check_new_datasets.py 失败", "err")
-        return []
-    return _load_latest_report(conp_path)
+    subprocess.run([sys.executable, check_script], text=True)
+    datasets.extend(_load_latest_report(conp_path, "dataset_discovery_"))
+    
+    # 2. 检查已有数据集的更新
+    if run_updates:
+        log("检查已有数据集的更新 (check_updates.py)...", "run")
+        update_script = os.path.join(scripts_dir, "check_updates.py")
+        subprocess.run([sys.executable, update_script], text=True)
+        update_list = _load_latest_report(conp_path, "dataset_updates_")
+        # 标记这些为更新任务，以便 pipeline 强制执行
+        for d in update_list:
+            d["is_update"] = True
+        datasets.extend(update_list)
+        
+    return datasets
 
 
-def _load_latest_report(conp_path: str) -> list:
+def _load_latest_report(conp_path: str, prefix: str) -> list:
     log_dir = os.path.join(conp_path, "log")
     if not os.path.isdir(log_dir):
-        log(f"log 目录不存在: {log_dir}", "warn")
         return []
     files = sorted(
         [f for f in os.listdir(log_dir)
-         if f.startswith("dataset_discovery_") and f.endswith(".json")],
+         if f.startswith(prefix) and f.endswith(".json")],
         reverse=True,
     )
     if not files:
@@ -206,9 +218,14 @@ def process_one(dataset: dict, scripts_dir: str, conp_path: str,
     key = dataset_key(dataset)
     title = dataset.get("title", "?")
 
-    if key in state["processed"]:
-        log(f"已处理过，跳过: {key}", "skip")
+    is_update = dataset.get("is_update", False)
+
+    if key in state["processed"] and not is_update:
+        log(f"已处理过且无更新，跳过: {key}", "skip")
         return "skip"
+    
+    if is_update:
+        log(f"检测到更新，强制执行: {key}", "warn")
 
     print(f"\n  {'─' * 58}")
     log(f"处理: {key}")

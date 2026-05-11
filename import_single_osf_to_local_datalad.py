@@ -276,8 +276,11 @@ def main():
     dataset_dir = os.path.abspath(os.path.join(args.basedir, "projects", folder_name))
     os.makedirs(dataset_dir, exist_ok=True)
 
-    print("🚀 Initializing DataLad...")
-    run(["datalad", "create", "--force", "."], cwd=dataset_dir)
+    print("🚀 Initializing DataLad (if needed)...")
+    if not os.path.exists(os.path.join(dataset_dir, ".datalad")):
+        run(["datalad", "create", "--force", "."], cwd=dataset_dir)
+    else:
+        print("✅ Directory is already a DataLad dataset, skipping creation.")
     configure_git_attributes(dataset_dir)
     ensure_osf_provider(dataset_dir, token)
 
@@ -297,46 +300,109 @@ def main():
     with open(os.path.join(dataset_dir, "README.md"), "w", encoding="utf-8") as f:
         f.write(generate_readme(dataset, total_size, size_unit))
     
-    # --- 处理 DATS.json (补全缺失字段) ---
+    # --- 处理 DATS.json (绝对最严合并逻辑) ---
     dats_path = os.path.join(dataset_dir, "DATS.json")
     perfect_dats = generate_dats_json(dataset, total_size, size_unit, len(file_sizes))
     
     if os.path.exists(dats_path):
-        print("📝 Existing DATS.json found, filling in missing mandatory fields...")
+        print("📝 Existing DATS.json found, applying ultimate strict merge...")
         try:
             with open(dats_path, 'r', encoding="utf-8") as f:
                 final_dats = json.load(f)
             
-            # 补全顶层字段
-            for key in ["types", "licenses", "keywords", "version"]:
-                if key not in final_dats or not final_dats[key]:
-                    final_dats[key] = perfect_dats[key]
+            # 1. 动态字段：Version
+            final_dats["version"] = attributes.get("date_modified", perfect_dats.get("version", final_dats.get("version")))
             
-            # 补全 distributions.formats
-            if "distributions" in final_dats and final_dats["distributions"]:
-                for dist in final_dats["distributions"]:
-                    if "formats" not in dist:
-                        dist["formats"] = ["N/A"]
+            # 2. 动态字段：Distributions (深度合并，仅改 size/unit)
+            if "distributions" in final_dats and isinstance(final_dats["distributions"], list) and len(final_dats["distributions"]) > 0:
+                # 我们假设第一个是主分发项
+                main_dist = final_dats["distributions"][0]
+                # 深度合并：确保必填项 (size, unit, formats, access) 存在
+                if "distributions" in perfect_dats and len(perfect_dats["distributions"]) > 0:
+                    template_dist = perfect_dats["distributions"][0]
+                    main_dist["size"] = template_dist["size"]
+                    main_dist["unit"] = template_dist["unit"]
+                    
+                    # 补齐必填项：formats (校验器强制要求)
+                    if "formats" not in main_dist or not main_dist["formats"]:
+                        main_dist["formats"] = template_dist.get("formats", ["DataLad"])
+                    
+                    # 补齐必填项：access
+                    if "access" not in main_dist:
+                        main_dist["access"] = template_dist.get("access", {})
+                    elif "landingPage" not in main_dist["access"]:
+                        main_dist["access"]["landingPage"] = template_dist.get("access", {}).get("landingPage", "")
+                # 保留 main_dist 里的所有其他项 (如 authorizations 等)
             else:
-                final_dats["distributions"] = perfect_dats["distributions"]
+                final_dats["distributions"] = perfect_dats.get("distributions", [])
                 
-            # 补全 extraProperties
-            existing_props = final_dats.get("extraProperties", [])
-            existing_cats = {p["category"] for p in existing_props if "category" in p}
-            for p in perfect_dats["extraProperties"]:
-                if p["category"] not in existing_cats:
-                    existing_props.append(p)
-            final_dats["extraProperties"] = existing_props
+            # 3. 动态字段：Dates (仅改/加 date modified)
+            now_str = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            mod_date_val = attributes.get("date_modified", now_str)
+            if "dates" in final_dats and isinstance(final_dats["dates"], list):
+                found_mod = False
+                for d in final_dats["dates"]:
+                    if d.get("type", {}).get("value") == "date modified":
+                        d["date"] = mod_date_val
+                        found_mod = True
+                if not found_mod:
+                    final_dats["dates"].append({
+                        "date": mod_date_val,
+                        "type": {"value": "date modified"}
+                    })
+            else:
+                final_dats["dates"] = perfect_dats.get("dates", [])
+
+            # 4. 增量补齐：仅当旧文件中完全没有某个顶级 key 时才从模板补齐
+            for key, val in perfect_dats.items():
+                if key not in final_dats:
+                    final_dats[key] = val
+                elif key == "extraProperties":
+                    # 对 extraProperties 进行内部增量补齐 (只加不减)
+                    existing_props = final_dats.get("extraProperties", [])
+                    existing_cats = {p.get("category") for p in existing_props if "category" in p}
+                    for p in perfect_dats.get("extraProperties", []):
+                        if p.get("category") not in existing_cats:
+                            existing_props.append(p)
+                    final_dats["extraProperties"] = existing_props
+                elif key == "creators":
+                    # 🚨 占位符保护：如果模板里是 Multiple Contributors，而旧文件里已经有了具体作者，绝对保留旧的
+                    old_creators = final_dats.get("creators", [])
+                    new_creators = perfect_dats.get("creators", [])
+                    if len(new_creators) > 0 and new_creators[0].get("name") == "Multiple Contributors":
+                        if len(old_creators) > 0 and old_creators[0].get("name") != "Multiple Contributors":
+                            print("🛡️  Preserving manually curated creators list...")
+                            # 保持 final_dats["creators"] 不变
+                        else:
+                            final_dats["creators"] = new_creators
+                    else:
+                        final_dats["creators"] = new_creators
+
+            # 5. 绝对锁定：keywords, licenses, description, title 等
+            # 只要在 final_dats 里已经存在的 key，绝对不再改动其值
+            
+            # 🚨 强效补丁：修复 types 校验 (必须是 information -> value 结构)
+            correct_types = perfect_dats.get("types", [{"information": {"value": "dataset"}}])
+            if "types" in final_dats:
+                old_types = final_dats["types"]
+                # 检查是否为标准列表格式且包含 information 键
+                is_valid = isinstance(old_types, list) and len(old_types) > 0 and isinstance(old_types[0], dict) and "information" in old_types[0]
+                if not is_valid:
+                    print("🔧 Repairing 'types' field for schema compliance...")
+                    final_dats["types"] = correct_types
+            else:
+                final_dats["types"] = correct_types
+                
         except Exception as e:
-            print(f"⚠️  Error reading existing DATS.json ({e}), using generated one.")
+            print(f"⚠️ Error in ultimate strict merge ({e}), falling back to template.")
             final_dats = perfect_dats
     else:
         print("📝 Generating standard DATS.json...")
         final_dats = perfect_dats
 
+    # 强制写回文件 (先删除以防 symlink 锁定)
     if os.path.lexists(dats_path):
         os.remove(dats_path)
-        
     with open(dats_path, "w", encoding="utf-8") as f:
         json.dump(final_dats, f, indent=4, ensure_ascii=False)
     run(["git", "add", "DATS.json"], cwd=dataset_dir)

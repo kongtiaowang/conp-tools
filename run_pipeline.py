@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import re
 import time
 from datetime import datetime
 
@@ -60,14 +61,33 @@ def log(msg: str, level: str = "info"):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {icons.get(level,'  ')} {msg}", flush=True)
 
 
-def run_subprocess(cmd: list, dry_run: bool = False) -> bool:
-    log(f"CMD: {' '.join(cmd)}", "run")
+def clean_title(title: str) -> str:
+    """Safe title for folder/repo names."""
+    clean = re.sub(r'[<>:"/\\|?*]', '_', title)
+    clean = re.sub(r'\s+', '_', clean)
+    clean = re.sub(r'_+', '_', clean)
+    clean = clean.strip('_')
+    return clean
+
+def clean_title(title: str) -> str:
+    """Safe title for folder/repo names."""
+    clean = re.sub(r'[<>:"/\\|?*]', '_', title)
+    clean = re.sub(r'\s+', '_', clean)
+    clean = re.sub(r'_+', '_', clean)
+    clean = clean.strip('_')
+    return clean
+
+def run_subprocess(cmd: list[str], dry_run: bool = False, cwd: str | None = None) -> bool:
+    """运行子进程并返回是否成功"""
     if dry_run:
-        log("[DRY RUN] 跳过实际执行", "warn")
+        log(f"[DRY-RUN] 模拟运行: {' '.join(cmd)}", "warn")
         return True
-    result = subprocess.run(cmd, text=True)
-    if result.returncode != 0:
-        log(f"命令失败 (exit {result.returncode})", "err")
+    
+    try:
+        subprocess.run(cmd, check=True, text=True, cwd=cwd)
+        return True
+    except subprocess.CalledProcessError as e:
+        log(f"命令失败: {' '.join(cmd)} (exit {e.returncode})", "err")
         return False
     return True
 
@@ -128,12 +148,26 @@ def check_new_datasets(scripts_dir: str, conp_path: str, run_updates: bool = Tru
     # 2. 检查已有数据集的更新
     if run_updates:
         log("检查已有数据集的更新 (check_updates.py)...", "run")
+        # Ensure the submodule is initialized and up to date if it's an update
+        # This is CRITICAL so the import script can read the existing DATS.json for merging
+        # Note: folder_name logic should be derived from specific dataset objects
+        
         update_script = os.path.join(scripts_dir, "check_updates.py")
         subprocess.run([sys.executable, update_script], text=True)
         update_list = _load_latest_report(conp_path, "dataset_updates_")
         # 标记这些为更新任务，以便 pipeline 强制执行
         for d in update_list:
             d["is_update"] = True
+            
+            # Initialize submodule for the update
+            folder_name = d.get("folder_name")
+            if folder_name:
+                print(f"🔄 Initializing existing submodule to preserve metadata: {folder_name}...")
+                try:
+                    run_subprocess(["git", "submodule", "update", "--init", f"projects/{folder_name}"], cwd=conp_path)
+                except:
+                    print(f"⚠️  Could not initialize submodule projects/{folder_name}. Metadata merge might fallback to template.")
+        
         datasets.extend(update_list)
         
     return datasets
@@ -206,6 +240,8 @@ def push_one(dataset: dict, scripts_dir: str, conp_path: str, org: str, dry_run:
     ]
     if dry_run:
         cmd.append("--dry-run")
+    if dataset.get("is_update"):
+        cmd.append("--update")
 
     return run_subprocess(cmd, dry_run=False)  # dry_run flag 已通过参数传入脚本
 
@@ -233,6 +269,40 @@ def process_one(dataset: dict, scripts_dir: str, conp_path: str,
     print(f"  {'─' * 58}")
 
     log("Step 2/3 — Import...", "run")
+    
+    # 🚨 CRITICAL: For updates, we MUST ensure the existing submodule is checked out
+    if is_update:
+        # Find the actual folder name by scanning the main repo's projects
+        target_id = dataset.get("record_id") or dataset.get("osf_id")
+        found_folder = None
+        
+        # Look into the project directories in the main repo
+        projects_dir = os.path.join(conp_path, "projects")
+        if os.path.exists(projects_dir):
+            for folder in os.listdir(projects_dir):
+                dats_file = os.path.join(projects_dir, folder, "DATS.json")
+                if os.path.exists(dats_file):
+                    try:
+                        with open(dats_file, "r") as f:
+                            dats = json.load(f)
+                        # Check extraProperties for the ID
+                        for prop in dats.get("extraProperties", []):
+                            if prop.get("category") in ["osf_node_id", "zenodo_record_id"]:
+                                if any(v.get("value") == target_id for v in prop.get("values", [])):
+                                    found_folder = folder
+                                    break
+                        if found_folder: break
+                    except: pass
+        
+        if found_folder:
+            print(f"🔄 Initializing existing submodule: projects/{found_folder} (matches ID {target_id})...")
+            try:
+                run_subprocess(["git", "submodule", "update", "--init", f"projects/{found_folder}"], dry_run=False, cwd=conp_path)
+            except:
+                print(f"⚠️  Could not initialize submodule projects/{found_folder}.")
+        else:
+            print(f"ℹ️  Could not find an existing submodule for ID {target_id}, might be a new dataset.")
+
     if not import_one(dataset, scripts_dir, conp_path, dry_run):
         state["failed"][key] = {
             "step": "import", "title": title, "time": datetime.now().isoformat()
@@ -348,10 +418,12 @@ def main():
             sys.exit(1)
         if args.type == "zenodo":
             dataset = {"source": "zenodo", "record_id": args.id,
-                       "identifiers": [args.id], "title": f"manual:{args.id}"}
+                       "identifiers": [args.id], "title": f"manual:{args.id}",
+                       "is_update": True}
         else:
             dataset = {"source": "osf", "osf_id": args.id,
-                       "identifiers": [args.id], "title": f"manual:{args.id}"}
+                       "identifiers": [args.id], "title": f"manual:{args.id}",
+                       "is_update": True}
         result = process_one(dataset, scripts_dir, conp_path, org, args.dry_run, state)
         sys.exit(0 if result in ("ok", "skip") else 1)
 

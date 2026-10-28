@@ -35,72 +35,306 @@ def find_dataset_dir(basedir: str, record_id: str) -> Optional[str]:
         if not os.path.isdir(folder_path):
             continue
             
-        # 支持多种爬虫配置文件 (Zenodo, OSF)
-        for config_name in [".conp-zenodo-crawler.json", ".conp-osf-crawler.json"]:
-            config_path = os.path.join(folder_path, config_name)
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                        # 兼容 Zenodo 的 record_id 和 OSF 的 node_id
-                        stored_id = config.get("record_id") or config.get("node_id")
-                        if str(stored_id) == str(record_id):
+        # Check OSF tracker
+        config_path = os.path.join(folder_path, ".conp-osf-crawler.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    stored_id = config.get("node_id")
+                    if str(stored_id) == str(record_id):
+                        return folder_path
+            except:
+                pass
+        
+        # Check Zenodo tracker
+        config_path = os.path.join(folder_path, ".conp-zenodo-crawler.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    stored_id = config.get("concept_id") or config.get("record_id")
+                    if str(stored_id) == str(record_id):
+                        return folder_path
+            except:
+                pass
+        
+        # Check DATS.json
+        dats_path = os.path.join(folder_path, "DATS.json")
+        if os.path.exists(dats_path):
+            try:
+                with open(dats_path, 'r') as f:
+                    dats = json.load(f)
+                    # Look for OSF ID
+                    extra_props = dats.get('extraProperties', [])
+                    for prop in extra_props:
+                        if prop.get('category') == 'osf_node_id':
+                            values = prop.get('values', [])
+                            for val in values:
+                                if str(val.get('value')) == str(record_id):
+                                    return folder_path
+                    
+                    # Look for Zenodo ID
+                    identifiers = dats.get('identifiers', [])
+                    for identifier in identifiers:
+                        id_value = identifier.get('identifier', '')
+                        if str(record_id) in id_value:
                             return folder_path
-                except:
-                    pass
+            except:
+                pass
+    
     return None
 
-def get_repo_name(folder_name: str) -> str:
+def find_repo_by_id_on_github(org: str, record_id: str) -> Optional[str]:
     """
-    Generate a GitHub repository name from the folder name.
-    Always adds 'conp-dataset-' prefix for the GitHub repo.
-    Sanitizes unsafe characters and truncates to 80 chars.
+    在 GitHub 上搜索 conp-bot 的所有仓库，查找包含该 record_id 的仓库
+    通过检查每个仓库的 .conp-*-crawler.json 或 DATS.json
     """
-    # Strip any existing conp-dataset- prefix first to avoid double-prefixing
+    print(f"   🔍 Searching GitHub for record ID: {record_id}...")
+    
+    try:
+        # 获取所有 conp-bot 的仓库
+        result = run(["gh", "repo", "list", org, "--limit", "100", "--json", "name"], capture_output=True)
+        repos = json.loads(result.stdout)
+        
+        print(f"   Found {len(repos)} repositories in {org}")
+        
+        for repo in repos:
+            repo_name = repo['name']
+            
+            # 跳过不是 conp-dataset- 开头的仓库
+            if not repo_name.startswith("conp-dataset-"):
+                continue
+            
+            # 尝试从仓库中读取 tracker 文件
+            # 方法1: 通过 GitHub API 获取 .conp-osf-crawler.json
+            api_url = f"https://api.github.com/repos/{org}/{repo_name}/contents/.conp-osf-crawler.json"
+            try:
+                req = urllib.request.Request(api_url)
+                req.add_header('Accept', 'application/vnd.github.v3+json')
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        content = data.get('content', '')
+                        if content:
+                            # Decode base64
+                            import base64
+                            content = base64.b64decode(content).decode('utf-8')
+                            tracker = json.loads(content)
+                            node_id = tracker.get('node_id')
+                            if str(node_id) == str(record_id):
+                                print(f"   ✅ Found OSF ID {record_id} in repo: {repo_name}")
+                                return repo_name
+            except:
+                pass
+            
+            # 方法2: 检查 Zenodo tracker
+            api_url = f"https://api.github.com/repos/{org}/{repo_name}/contents/.conp-zenodo-crawler.json"
+            try:
+                req = urllib.request.Request(api_url)
+                req.add_header('Accept', 'application/vnd.github.v3+json')
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        content = data.get('content', '')
+                        if content:
+                            import base64
+                            content = base64.b64decode(content).decode('utf-8')
+                            tracker = json.loads(content)
+                            # 检查 concept_id 或 record_id
+                            concept_id = tracker.get('concept_id')
+                            record_id_tracker = tracker.get('record_id')
+                            if str(concept_id) == str(record_id) or str(record_id_tracker) == str(record_id):
+                                print(f"   ✅ Found Zenodo ID {record_id} in repo: {repo_name}")
+                                return repo_name
+            except:
+                pass
+            
+            # 方法3: 检查 DATS.json
+            api_url = f"https://api.github.com/repos/{org}/{repo_name}/contents/DATS.json"
+            try:
+                req = urllib.request.Request(api_url)
+                req.add_header('Accept', 'application/vnd.github.v3+json')
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        content = data.get('content', '')
+                        if content:
+                            import base64
+                            content = base64.b64decode(content).decode('utf-8')
+                            dats = json.loads(content)
+                            
+                            # 检查 OSF ID
+                            extra_props = dats.get('extraProperties', [])
+                            for prop in extra_props:
+                                if prop.get('category') == 'osf_node_id':
+                                    values = prop.get('values', [])
+                                    for val in values:
+                                        if str(val.get('value')) == str(record_id):
+                                            print(f"   ✅ Found OSF ID {record_id} in DATS.json of repo: {repo_name}")
+                                            return repo_name
+                            
+                            # 检查 Zenodo ID
+                            identifiers = dats.get('identifiers', [])
+                            for identifier in identifiers:
+                                id_value = identifier.get('identifier', '')
+                                if str(record_id) in id_value:
+                                    print(f"   ✅ Found Zenodo ID {record_id} in DATS.json of repo: {repo_name}")
+                                    return repo_name
+            except:
+                pass
+        
+        print(f"   ❌ No existing repo found for record ID: {record_id}")
+        return None
+        
+    except Exception as e:
+        print(f"   ⚠️ Error searching GitHub: {e}")
+        return None
+
+def get_repo_name(folder_name: str, record_id: str, org: str = "conp-bot") -> str:
+    """
+    Get GitHub repository name.
+    Priority:
+    1. Find existing repo by ID on GitHub
+    2. Auto-generate from folder name
+    """
+    
+    # 1. 在 GitHub 上查找包含此 ID 的现有仓库
+    existing_repo = find_repo_by_id_on_github(org, record_id)
+    if existing_repo:
+        print(f"   📦 Using existing repo: {existing_repo}")
+        return existing_repo
+    
+    # 2. 自动生成新仓库名
+    print(f"   🆕 No existing repo found. Creating new repo from folder name...")
     name = folder_name.removeprefix("conp-dataset-")
-    # Remove everything after the first parenthesis if present
     name = name.split('(')[0].strip('_')
-    # Replace problematic characters with safe alternatives
     name = name.replace('&', 'and')
     name = name.replace(',', '')
     name = name.replace(' ', '_')
-    # Collapse multiple underscores
     name = re.sub(r'_+', '_', name)
-    # Add the conp-dataset- prefix for GitHub repo name
     name = f"conp-dataset-{name}"
-    # Truncate to a reasonable length
     if len(name) > 80:
         name = name[:80].strip('_')
     return name
+
+def update_existing_repo(dataset_dir: str, repo_name: str, org: str, dry_run: bool):
+    """Update an existing GitHub repository with latest changes"""
+    print(f"\n📦 Updating existing repository: {org}/{repo_name}")
+    
+    if dry_run:
+        print(f"Would update: {dataset_dir}")
+        print(f"Would push to: https://github.com/{org}/{repo_name}.git")
+        return
+    
+    # Ensure we have the remote
+    try:
+        run(["git", "remote", "get-url", "origin"], cwd=dataset_dir, capture_output=True)
+    except subprocess.CalledProcessError:
+        repo_url = f"https://github.com/{org}/{repo_name}.git"
+        run(["git", "remote", "add", "origin", repo_url], cwd=dataset_dir)
+    
+    # Check if repo exists on GitHub
+    try:
+        run(["gh", "repo", "view", f"{org}/{repo_name}"], capture_output=True)
+        print(f"✅ Repository {org}/{repo_name} exists")
+    except subprocess.CalledProcessError:
+        print(f"❌ Repository {org}/{repo_name} does not exist!")
+        print(f"   Creating new repository...")
+        run(["gh", "repo", "create", f"{org}/{repo_name}", "--public", "--confirm"])
+    
+    # Get current branch
+    try:
+        branch_result = run(["git", "symbolic-ref", "--short", "HEAD"], cwd=dataset_dir, capture_output=True)
+        current_branch = branch_result.stdout.strip()
+    except:
+        current_branch = "master"
+    
+    # Add all changes
+    print("📝 Adding changes...")
+    run(["git", "add", "."], cwd=dataset_dir)
+    
+    # Check if there are changes to commit
+    status_result = run(["git", "status", "--porcelain"], cwd=dataset_dir, capture_output=True)
+    if status_result.stdout.strip():
+        print("📝 Committing changes...")
+        run(["git", "commit", "-m", "Update dataset from OSF/Zenodo", "--no-verify"], cwd=dataset_dir)
+        
+        # Push to GitHub
+        print(f"🚀 Pushing to {org}/{repo_name}...")
+        run(["git", "push", "-u", "origin", current_branch, "--force"], cwd=dataset_dir)
+        
+        # Also push git-annex if it exists
+        try:
+            run(["git", "push", "origin", "git-annex", "--force"], cwd=dataset_dir)
+        except:
+            print("   No git-annex branch to push")
+        
+        print(f"✅ Successfully updated {org}/{repo_name}")
+    else:
+        print("ℹ️  No changes to commit")
+
+def create_new_repo(dataset_dir: str, repo_name: str, org: str, dry_run: bool):
+    """Create a new GitHub repository and push dataset"""
+    print(f"\n📦 Creating new repository: {org}/{repo_name}")
+    
+    if dry_run:
+        print(f"Would create: https://github.com/{org}/{repo_name}.git")
+        print(f"Would push from: {dataset_dir}")
+        return
+    
+    repo_url = f"https://github.com/{org}/{repo_name}.git"
+    try:
+        run(["gh", "repo", "view", f"{org}/{repo_name}"], capture_output=True)
+        print(f"✅ Repository {org}/{repo_name} already exists")
+    except subprocess.CalledProcessError:
+        print(f"➕ Creating new repository: {org}/{repo_name}...")
+        run(["gh", "repo", "create", f"{org}/{repo_name}", "--public", "--confirm"])
+    
+    # Update remote
+    run(["git", "remote", "remove", "origin"], cwd=dataset_dir, check=False)
+    run(["git", "remote", "add", "origin", repo_url], cwd=dataset_dir)
+    
+    # Push branches
+    try:
+        branch_result = run(["git", "symbolic-ref", "--short", "HEAD"], cwd=dataset_dir, capture_output=True)
+        current_branch = branch_result.stdout.strip()
+    except:
+        current_branch = "master"
+    
+    print(f"🚀 Pushing {current_branch} branch...")
+    run(["git", "push", "-u", "--force", "origin", current_branch], cwd=dataset_dir)
+    
+    print("🚀 Pushing git-annex branch...")
+    try:
+        run(["git", "push", "--force", "origin", "git-annex"], cwd=dataset_dir)
+    except subprocess.CalledProcessError:
+        print("   No git-annex branch to push")
 
 def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, repo_name: str, org: str, record_id: str, dry_run: bool, is_update: bool = False):
     """Add dataset as submodule on a new branch and create a PR."""
     folder_name = os.path.basename(dataset_dir)
     relative_path = os.path.join("projects", folder_name)
     
-    # Use a unique branch name for this dataset
     prefix = "update-dataset" if is_update else "add-dataset"
     branch_name = f"{prefix}-{record_id}"
     
-    # Try to extract a clean title for the commit message
     clean_title = repo_name.replace("conp-dataset-", "").replace("_", " ")
     
-    print(f"\n🔗 Integrating dataset into main repository at {main_repo_path} using branch {branch_name}...")
+    print(f"\n🔗 Integrating dataset into main repository using branch {branch_name}...")
     
     if dry_run:
         print(f"Would create branch: {branch_name}")
-        print(f"Would run: git submodule add {repo_url} {relative_path}")
-        print(f"Would commit: Add dataset: {clean_title}")
-        print(f"Would push to: {branch_name}")
-        print(f"Would run: gh pr create --repo CONP-PCNO/conp-dataset --base master --head {org}:{branch_name} ...")
+        print(f"Would update submodule: {relative_path}")
+        print(f"Would commit: {'Update' if is_update else 'Add'} dataset: {clean_title}")
         return
-
-    # --- 自动修复：清理已知会导致 Git 崩溃的损坏子模块路径 ---
+    
+    # Clean up broken paths
     broken_paths = ["projects/cneuromod_processed"]
     for bp in broken_paths:
         bp_path = os.path.join(main_repo_path, bp)
         if os.path.lexists(bp_path):
-            print(f"🧹 Cleanup: Removing corrupted submodule path to prevent Git crash: {bp}")
+            print(f"🧹 Cleanup: Removing corrupted submodule path: {bp}")
             try:
                 if os.path.isdir(bp_path) and not os.path.islink(bp_path):
                     import shutil
@@ -109,10 +343,9 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
                     os.remove(bp_path)
             except Exception as e:
                 print(f"⚠️  Could not remove {bp}: {e}")
-
-    # Ensure the main repository is up‑to‑date with upstream (or origin) before branching
-    print("🔄 Syncing main repository with upstream/master ...")
-    # If an upstream remote exists, fetch from it; otherwise fetch from origin
+    
+    # Sync with upstream
+    print("🔄 Syncing main repository...")
     try:
         run(["git", "remote", "get-url", "upstream"], cwd=main_repo_path)
         upstream_remote = "upstream"
@@ -120,54 +353,50 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
         upstream_remote = "origin"
     
     run(["git", "fetch", upstream_remote], cwd=main_repo_path)
-
-    # 1. Start from a clean master
-    print(f"🔄 Syncing main repository with {upstream_remote}/master ...")
-    if upstream_remote == "origin":
-        print("⚠️  WARNING: 'upstream' remote not found. Using 'origin' instead. \n"
-              "   If your fork's master is not in sync with CONP-PCNO/conp-dataset, the PR will contain unrelated commits.")
-    
     run(["git", "checkout", "--no-recurse-submodules", "-f", "master"], cwd=main_repo_path)
     run(["git", "reset", "--hard", f"{upstream_remote}/master"], cwd=main_repo_path)
     run(["git", "clean", "-fd"], cwd=main_repo_path)
     
-    # 2. Create or reset the dataset branch
+    # Create or switch to branch
     print(f"🌿 Switching to branch {branch_name}...")
     try:
         run(["git", "checkout", "--no-recurse-submodules", "-B", branch_name], cwd=main_repo_path)
     except subprocess.CalledProcessError:
-        # If the branch already exists, just checkout it
-        print(f"⚠️ Branch {branch_name} already exists, checking out ...")
         run(["git", "checkout", branch_name], cwd=main_repo_path)
-
-
-    # 3. Add submodule
-    print(f"➕ Adding submodule at {relative_path}...")
+    
+    # Update or add submodule
+    print(f"📦 {'Updating' if is_update else 'Adding'} submodule at {relative_path}...")
+    
+    # Check if submodule already exists
+    submodule_exists = False
     try:
+        result = run(["git", "submodule", "status", relative_path], cwd=main_repo_path, capture_output=True, check=False)
+        if result.returncode == 0:
+            submodule_exists = True
+    except:
+        pass
+    
+    if submodule_exists or is_update:
+        # Update existing submodule
+        run(["git", "submodule", "update", "--init", "--recursive", relative_path], cwd=main_repo_path, check=False)
+        run(["git", "add", relative_path], cwd=main_repo_path)
+    else:
+        # Add as new submodule
         run(["git", "submodule", "add", "--force", repo_url, relative_path], cwd=main_repo_path)
-    except subprocess.CalledProcessError:
-        print(f"⚠️  Submodule add failed. Trying to clear index and retry...")
-        run(["git", "rm", "-r", "--cached", relative_path], cwd=main_repo_path, check=False)
-        try:
-            run(["git", "submodule", "add", "--force", repo_url, relative_path], cwd=main_repo_path)
-        except:
-            print("⚠️  Still failed. Trying to add files directly...")
-            run(["git", "add", relative_path], cwd=main_repo_path)
-
-    # 2. Commit
-    print("📝 Committing changes...")
-    commit_msg = f"Add dataset: {clean_title}"
+    
+    # Commit
+    commit_msg = f"{'Update' if is_update else 'Add'} dataset: {clean_title}"
     try:
         run(["git", "commit", "-m", commit_msg, "--no-verify"], cwd=main_repo_path)
     except subprocess.CalledProcessError:
         print("ℹ️  Nothing to commit.")
-
-    # 6. Push the new branch
-    print(f"🚀 Pushing to fork branch {branch_name}...")
+    
+    # Push branch
+    print(f"🚀 Pushing branch {branch_name}...")
     run(["git", "push", "-f", "-u", "origin", branch_name], cwd=main_repo_path)
-
-    # 4. Create Pull Request using gh cli
-    print("📝 Creating Pull Request on GitHub...")
+    
+    # Create PR
+    print("📝 Creating Pull Request...")
     pr_type = "Update" if is_update else "Add"
     pr_title = f"{pr_type} dataset: {clean_title}"
     try:
@@ -200,7 +429,6 @@ def main():
 
     record_id = args.record.split("/")[-1]
     
-    # 🌟 改进：如果指定了 main_repo 但没指定 basedir，自动使用 main_repo 寻找数据集
     search_dir = args.basedir
     if args.main_repo and args.basedir == ".":
         search_dir = args.main_repo
@@ -209,63 +437,28 @@ def main():
     dataset_dir = find_dataset_dir(search_dir, record_id)
     
     if not dataset_dir:
-        print(f"❌ Error: Could not find dataset directory for record {record_id} in {search_dir}/projects")
+        print(f"❌ Error: Could not find dataset directory for record {record_id}")
         return
 
     folder_name = os.path.basename(dataset_dir)
-    repo_name = get_repo_name(folder_name)
+    
+    # 获取 repo 名称：先在 GitHub 上查找包含该 ID 的现有仓库
+    repo_name = get_repo_name(folder_name, record_id, args.org)
     repo_url = f"https://github.com/{args.org}/{repo_name}.git"
     
     print(f"📂 Found dataset at: {dataset_dir}")
-    print(f"🏷️  Suggested repo name: {repo_name}")
+    print(f"🏷️  Repo name: {repo_name}")
     print(f"🔗 Target URL: {repo_url}")
-
-    if args.dry_run and not args.pr:
-        print("\n--- DRY RUN ---")
-        print(f"Would check if repo exists: gh repo view {args.org}/{repo_name}")
-        print(f"Would create repo if missing: gh repo create {args.org}/{repo_name} --public")
-        print(f"Would update git remote origin to: {repo_url}")
-        print(f"Would push branches: main, git-annex")
     
-    if not args.dry_run:
-        # 1. Check if repo exists
-        print(f"📡 Checking if repository {args.org}/{repo_name} exists...")
-        try:
-            run(["gh", "repo", "view", f"{args.org}/{repo_name}"], capture_output=True)
-            print("✅ Repository already exists.")
-        except subprocess.CalledProcessError:
-            print(f"➕ Creating new repository: {args.org}/{repo_name}...")
-            run(["gh", "repo", "create", f"{args.org}/{repo_name}", "--public", "--confirm"])
-
-        # 2. Update remote
-        print("🔄 Updating git remotes...")
-        try:
-            run(["git", "remote", "remove", "origin"], cwd=dataset_dir)
-        except subprocess.CalledProcessError:
-            pass # origin might not exist
-        
-        run(["git", "remote", "add", "origin", repo_url], cwd=dataset_dir)
-
-        # 3. Push branches
-        print("🚀 Detecting branch name...")
-        try:
-            branch_result = run(["git", "symbolic-ref", "--short", "HEAD"], cwd=dataset_dir, capture_output=True)
-            current_branch = branch_result.stdout.strip()
-        except:
-            # Fallback for detached HEAD: try to find if it matches master or main, otherwise default to master
-            print("⚠️  Detached HEAD detected or branch name unknown. Falling back to 'master'.")
-            current_branch = "master"
-            
-        print(f"🚀 Pushing {current_branch} branch...")
-        run(["git", "push", "-u", "--force", "origin", current_branch], cwd=dataset_dir)
-        
-        print("🚀 Pushing git-annex branch...")
-        try:
-            run(["git", "push", "--force", "origin", "git-annex"], cwd=dataset_dir)
-        except subprocess.CalledProcessError:
-            print("⚠️  Warning: git-annex branch push failed (it might not exist if no large files were added).")
-
-    # 4. Handle PR workflow
+    # Check if this is an update or new dataset
+    if args.update:
+        print(f"\n🔄 UPDATE MODE: Updating existing dataset")
+        update_existing_repo(dataset_dir, repo_name, args.org, args.dry_run)
+    else:
+        print(f"\n➕ NEW DATASET MODE: Adding new dataset")
+        create_new_repo(dataset_dir, repo_name, args.org, args.dry_run)
+    
+    # Handle PR workflow
     if args.pr:
         main_repo_path = args.main_repo or os.path.abspath(args.basedir)
         create_pull_request(main_repo_path, dataset_dir, repo_url, repo_name, args.org, record_id, args.dry_run, args.update)

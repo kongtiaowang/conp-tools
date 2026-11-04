@@ -7,10 +7,10 @@ import json
 import urllib.request
 from typing import Optional
 
-def run(cmd: list[str], cwd: str | None = None, capture_output: bool = False):
+def run(cmd: list[str], cwd: str | None = None, capture_output: bool = False, check: bool = True):
     """Run a command and return the result."""
     result = subprocess.run(cmd, cwd=cwd, capture_output=capture_output, text=True)
-    if result.returncode != 0:
+    if check and result.returncode != 0:
         if capture_output:
             print(f"Error running {' '.join(cmd)}: {result.stderr}")
         raise subprocess.CalledProcessError(result.returncode, cmd)
@@ -35,14 +35,14 @@ def find_dataset_dir(basedir: str, record_id: str) -> Optional[str]:
         if not os.path.isdir(folder_path):
             continue
             
-        # 支持多种爬虫配置文件 (Zenodo, OSF)
+        # Support multiple crawler config files (Zenodo, OSF)
         for config_name in [".conp-zenodo-crawler.json", ".conp-osf-crawler.json"]:
             config_path = os.path.join(folder_path, config_name)
             if os.path.exists(config_path):
                 try:
                     with open(config_path, 'r') as f:
                         config = json.load(f)
-                        # 兼容 Zenodo 的 record_id 和 OSF 的 node_id
+                        # Handle both Zenodo's record_id and OSF's node_id
                         stored_id = config.get("record_id") or config.get("node_id")
                         if str(stored_id) == str(record_id):
                             return folder_path
@@ -73,13 +73,14 @@ def get_repo_name(folder_name: str) -> str:
         name = name[:80].strip('_')
     return name
 
-def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, repo_name: str, org: str, record_id: str, dry_run: bool):
+def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, repo_name: str, org: str, record_id: str, dry_run: bool, is_update: bool = False):
     """Add dataset as submodule on a new branch and create a PR."""
     folder_name = os.path.basename(dataset_dir)
     relative_path = os.path.join("projects", folder_name)
     
     # Use a unique branch name for this dataset
-    branch_name = f"add-dataset-{record_id}"
+    prefix = "update-dataset" if is_update else "add-dataset"
+    branch_name = f"{prefix}-{record_id}"
     
     # Try to extract a clean title for the commit message
     clean_title = repo_name.replace("conp-dataset-", "").replace("_", " ")
@@ -94,7 +95,7 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
         print(f"Would run: gh pr create --repo CONP-PCNO/conp-dataset --base master --head {org}:{branch_name} ...")
         return
 
-    # --- 自动修复：清理已知会导致 Git 崩溃的损坏子模块路径 ---
+    # --- Auto-repair: clean up broken submodule paths known to crash Git ---
     broken_paths = ["projects/cneuromod_processed"]
     for bp in broken_paths:
         bp_path = os.path.join(main_repo_path, bp)
@@ -122,8 +123,13 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
 
     # 1. Start from a clean master
     print(f"🔄 Syncing main repository with {upstream_remote}/master ...")
-    run(["git", "checkout", "--no-recurse-submodules", "master"], cwd=main_repo_path)
+    if upstream_remote == "origin":
+        print("⚠️  WARNING: 'upstream' remote not found. Using 'origin' instead. \n"
+              "   If your fork's master is not in sync with CONP-PCNO/conp-dataset, the PR will contain unrelated commits.")
+    
+    run(["git", "checkout", "--no-recurse-submodules", "-f", "master"], cwd=main_repo_path)
     run(["git", "reset", "--hard", f"{upstream_remote}/master"], cwd=main_repo_path)
+    run(["git", "clean", "-fd"], cwd=main_repo_path)
     
     # 2. Create or reset the dataset branch
     print(f"🌿 Switching to branch {branch_name}...")
@@ -135,13 +141,18 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
         run(["git", "checkout", branch_name], cwd=main_repo_path)
 
 
-    # 1. Add submodule
+    # 3. Add submodule
     print(f"➕ Adding submodule at {relative_path}...")
     try:
-        run(["git", "submodule", "add", repo_url, relative_path], cwd=main_repo_path)
+        run(["git", "submodule", "add", "--force", repo_url, relative_path], cwd=main_repo_path)
     except subprocess.CalledProcessError:
-        print("⚠️  Submodule add failed. Trying to add files directly...")
-        run(["git", "add", ".gitmodules", relative_path], cwd=main_repo_path)
+        print(f"⚠️  Submodule add failed. Trying to clear index and retry...")
+        run(["git", "rm", "-r", "--cached", relative_path], cwd=main_repo_path, check=False)
+        try:
+            run(["git", "submodule", "add", "--force", repo_url, relative_path], cwd=main_repo_path)
+        except:
+            print("⚠️  Still failed. Trying to add files directly...")
+            run(["git", "add", relative_path], cwd=main_repo_path)
 
     # 2. Commit
     print("📝 Committing changes...")
@@ -151,15 +162,14 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
     except subprocess.CalledProcessError:
         print("ℹ️  Nothing to commit.")
 
-    # 3. Push to fork using the new branch
+    # 6. Push the new branch
     print(f"🚀 Pushing to fork branch {branch_name}...")
-    run(["git", "push", "-u", "origin", branch_name], cwd=main_repo_path)
+    run(["git", "push", "-f", "-u", "origin", branch_name], cwd=main_repo_path)
 
-    # 4. Create PR
+    # 4. Create Pull Request using gh cli
     print("📝 Creating Pull Request on GitHub...")
-    pr_title = f"Add dataset: {clean_title}"
-    pr_body = f"New dataset added as submodule: {repo_name}\n\nAutomatically generated by CONP-Zenodo-Crawler."
-    
+    pr_type = "Update" if is_update else "Add"
+    pr_title = f"{pr_type} dataset: {clean_title}"
     try:
         run([
             "gh", "pr", "create", 
@@ -167,7 +177,7 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
             "--base", "master", 
             "--head", f"{org}:{branch_name}", 
             "--title", pr_title, 
-            "--body", pr_body
+            "--body", f"Automated {pr_type.lower()} of dataset {clean_title} from {repo_url}"
         ], cwd=main_repo_path)
     except subprocess.CalledProcessError as e:
         print(f"⚠️  PR creation failed: {e}. It might already exist.")
@@ -178,17 +188,19 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
 
 def main():
     parser = argparse.ArgumentParser(description="Push an imported dataset to GitHub and optionally create a PR.")
-    parser.add_argument("--record", required=True, help="Zenodo Record ID")
-    parser.add_argument("--basedir", default=".", help="Base directory for the projects")
-    parser.add_argument("--org", default="conp-bot", help="GitHub organization/user")
-    parser.add_argument("--pr", action="store_true", help="Create a Pull Request to CONP-PCNO/conp-dataset")
+    parser.add_argument("--record", required=True, help="Record ID or path to search for")
+    parser.add_argument("--basedir", default=".", help="Base directory where 'projects' folder is located")
     parser.add_argument("--main-repo", help="Path to the main conp-dataset repository")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be done without doing it")
+    parser.add_argument("--org", default="conp-bot", help="GitHub organization/user to push to")
+    parser.add_argument("--pr", action="store_true", help="Whether to create a Pull Request to CONP-PCNO/conp-dataset")
+    parser.add_argument("--update", action="store_true", help="Whether this is an update to an existing dataset")
+    parser.add_argument("--zenodo-token", help="Zenodo API token (optional)")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be done without executing")
     args = parser.parse_args()
 
     record_id = args.record.split("/")[-1]
     
-    # 🌟 改进：如果指定了 main_repo 但没指定 basedir，自动使用 main_repo 寻找数据集
+    # Improvement: if main_repo is set without basedir, use main_repo to locate datasets
     search_dir = args.basedir
     if args.main_repo and args.basedir == ".":
         search_dir = args.main_repo
@@ -236,8 +248,14 @@ def main():
 
         # 3. Push branches
         print("🚀 Detecting branch name...")
-        branch_result = run(["git", "symbolic-ref", "--short", "HEAD"], cwd=dataset_dir, capture_output=True)
-        current_branch = branch_result.stdout.strip()
+        try:
+            branch_result = run(["git", "symbolic-ref", "--short", "HEAD"], cwd=dataset_dir, capture_output=True)
+            current_branch = branch_result.stdout.strip()
+        except:
+            # Fallback for detached HEAD: try to find if it matches master or main, otherwise default to master
+            print("⚠️  Detached HEAD detected or branch name unknown. Falling back to 'master'.")
+            current_branch = "master"
+            
         print(f"🚀 Pushing {current_branch} branch...")
         run(["git", "push", "-u", "--force", "origin", current_branch], cwd=dataset_dir)
         
@@ -250,7 +268,7 @@ def main():
     # 4. Handle PR workflow
     if args.pr:
         main_repo_path = args.main_repo or os.path.abspath(args.basedir)
-        create_pull_request(main_repo_path, dataset_dir, repo_url, repo_name, args.org, record_id, args.dry_run)
+        create_pull_request(main_repo_path, dataset_dir, repo_url, repo_name, args.org, record_id, args.dry_run, args.update)
 
     print(f"\n✨ Success! Workflow complete.")
 

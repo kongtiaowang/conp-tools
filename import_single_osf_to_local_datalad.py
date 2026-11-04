@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 from typing import List, Dict, Any
 
-# 定义需要直接保存为普通文件的后缀
+# File extensions that must be stored as regular files (not annexed)
 TEXT_EXTENSIONS = {'.csv', '.json', '.md', '.txt', '.py', '.yml', '.yaml', '.tsv', '.jsonld', '.html'}
 TEXT_FILENAMES = {'README', 'LICENSE', 'CHANGES', 'AUTHORS', 'MANIFEST', 'DESCRIPTION'}
 
@@ -37,7 +37,7 @@ def capture(cmd: list[str], cwd: str | None = None) -> str:
     return subprocess.check_output(cmd, cwd=cwd, text=True)
 
 def clean_title(title: str) -> str:
-    """标题安全化，限制在 80 字符"""
+    """Sanitize the title, capped at 80 characters"""
     clean = re.sub(r'[<>:"/\\|?*]', '_', title)
     clean = re.sub(r'\s+', '_', clean)
     clean = re.sub(r'_+', '_', clean)
@@ -112,7 +112,7 @@ def fetch_paginated_data(url: str, token: str | None = None) -> list[dict]:
     return items
 
 def configure_git_attributes(dataset_dir: str):
-    """配置 .gitattributes 确保文本文件不进 Annex"""
+    """Configure .gitattributes so text files stay out of the annex"""
     attr_path = os.path.join(dataset_dir, ".gitattributes")
     patterns = [
         "README.md annex.largefiles=nothing",
@@ -164,7 +164,7 @@ def download_files(files_link: str, current_dir: str, inner_path: str, dataset_d
         target_rel = os.path.join(inner_path, name) if inner_path else name
         target_abs = os.path.join(dataset_dir, target_rel)
         
-        # 确保父目录存在
+        # Make sure the parent directory exists
         parent_dir = os.path.dirname(target_abs)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
@@ -174,7 +174,7 @@ def download_files(files_link: str, current_dir: str, inner_path: str, dataset_d
         if is_text_file(name):
             print(f"   📄 [TEXT] Downloading: {target_rel}")
             try:
-                # 🌟 修复：如果文件已存在（可能是 Annex 链接），先删除它，否则 open() 会报错
+                # Fix: if the file already exists (possibly an annex symlink), remove it first, otherwise open() raises
                 if os.path.lexists(target_abs):
                     os.remove(target_abs)
                 
@@ -250,7 +250,7 @@ def main():
     print(f"📥 Fetching OSF node {node_id}...")
     node_data = fetch_json(f"https://api.osf.io/v2/nodes/{node_id}/", token)["data"]
     
-    # 模拟 build_description 逻辑
+    # Mimic the build_description logic
     relationships = node_data["relationships"]
     attributes = node_data["attributes"]
     
@@ -261,10 +261,10 @@ def main():
         "description": attributes.get("description", ""),
         "version": attributes["date_modified"],
         "files_link": relationships["files"]["links"]["related"]["href"],
-        "creators": [{"name": c} for c in ["Multiple Contributors"]], # 简化处理，可后续丰富
+        "creators": [{"name": c} for c in ["Multiple Contributors"]], # simplified; can be enriched later
     }
     
-    # 获取 Wiki (可选)
+    # Fetch the wiki (optional)
     try:
         wikis = fetch_paginated_data(relationships["wikis"]["links"]["related"]["href"], token)
         if wikis:
@@ -288,7 +288,7 @@ def main():
     print("🔗 Downloading files...")
     download_files(dataset["files_link"], dataset_dir, "", dataset_dir, token, file_sizes)
     
-    # 获取组件
+    # Fetch the components
     components = fetch_paginated_data(relationships["children"]["links"]["related"]["href"], token)
     if components:
         print(f"📦 Downloading {len(components)} components...")
@@ -300,7 +300,7 @@ def main():
     with open(os.path.join(dataset_dir, "README.md"), "w", encoding="utf-8") as f:
         f.write(generate_readme(dataset, total_size, size_unit))
     
-    # --- 处理 DATS.json (绝对最严合并逻辑) ---
+    # --- Handle DATS.json (strictest merge logic) ---
     dats_path = os.path.join(dataset_dir, "DATS.json")
     perfect_dats = generate_dats_json(dataset, total_size, size_unit, len(file_sizes))
     
@@ -310,33 +310,33 @@ def main():
             with open(dats_path, 'r', encoding="utf-8") as f:
                 final_dats = json.load(f)
             
-            # 1. 动态字段：Version
+            # 1. Dynamic field: Version
             final_dats["version"] = attributes.get("date_modified", perfect_dats.get("version", final_dats.get("version")))
             
-            # 2. 动态字段：Distributions (深度合并，仅改 size/unit)
+            # 2. Dynamic field: Distributions (deep merge, only size/unit are updated)
             if "distributions" in final_dats and isinstance(final_dats["distributions"], list) and len(final_dats["distributions"]) > 0:
-                # 我们假设第一个是主分发项
+                # Assume the first entry is the main distribution
                 main_dist = final_dats["distributions"][0]
-                # 深度合并：确保必填项 (size, unit, formats, access) 存在
+                # Deep merge: make sure the required fields (size, unit, formats, access) exist
                 if "distributions" in perfect_dats and len(perfect_dats["distributions"]) > 0:
                     template_dist = perfect_dats["distributions"][0]
                     main_dist["size"] = template_dist["size"]
                     main_dist["unit"] = template_dist["unit"]
                     
-                    # 补齐必填项：formats (校验器强制要求)
+                    # Fill in required field: formats (enforced by the validator)
                     if "formats" not in main_dist or not main_dist["formats"]:
                         main_dist["formats"] = template_dist.get("formats", ["DataLad"])
                     
-                    # 补齐必填项：access
+                    # Fill in required field: access
                     if "access" not in main_dist:
                         main_dist["access"] = template_dist.get("access", {})
                     elif "landingPage" not in main_dist["access"]:
                         main_dist["access"]["landingPage"] = template_dist.get("access", {}).get("landingPage", "")
-                # 保留 main_dist 里的所有其他项 (如 authorizations 等)
+                # Keep every other entry from main_dist (authorizations, etc.)
             else:
                 final_dats["distributions"] = perfect_dats.get("distributions", [])
                 
-            # 3. 动态字段：Dates (仅改/加 date modified)
+            # 3. Dynamic field: Dates (only set/add date modified)
             now_str = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             mod_date_val = attributes.get("date_modified", now_str)
             if "dates" in final_dats and isinstance(final_dats["dates"], list):
@@ -353,12 +353,12 @@ def main():
             else:
                 final_dats["dates"] = perfect_dats.get("dates", [])
 
-            # 4. 增量补齐：仅当旧文件中完全没有某个顶级 key 时才从模板补齐
+            # 4. Incremental fill: copy a top-level key from the template only when it is missing entirely
             for key, val in perfect_dats.items():
                 if key not in final_dats:
                     final_dats[key] = val
                 elif key == "extraProperties":
-                    # 对 extraProperties 进行内部增量补齐 (只加不减)
+                    # Fill extraProperties incrementally too (add only, never remove)
                     existing_props = final_dats.get("extraProperties", [])
                     existing_cats = {p.get("category") for p in existing_props if "category" in p}
                     for p in perfect_dats.get("extraProperties", []):
@@ -366,26 +366,26 @@ def main():
                             existing_props.append(p)
                     final_dats["extraProperties"] = existing_props
                 elif key == "creators":
-                    # 🚨 占位符保护：如果模板里是 Multiple Contributors，而旧文件里已经有了具体作者，绝对保留旧的
+                    # Placeholder guard: if the template says Multiple Contributors but the old file has real authors, keep the old ones
                     old_creators = final_dats.get("creators", [])
                     new_creators = perfect_dats.get("creators", [])
                     if len(new_creators) > 0 and new_creators[0].get("name") == "Multiple Contributors":
                         if len(old_creators) > 0 and old_creators[0].get("name") != "Multiple Contributors":
                             print("🛡️  Preserving manually curated creators list...")
-                            # 保持 final_dats["creators"] 不变
+                            # Leave final_dats["creators"] untouched
                         else:
                             final_dats["creators"] = new_creators
                     else:
                         final_dats["creators"] = new_creators
 
-            # 5. 绝对锁定：keywords, licenses, description, title 等
-            # 只要在 final_dats 里已经存在的 key，绝对不再改动其值
+            # 5. Hard lock: keywords, licenses, description, title, etc.
+            # Never modify the value of any key already present in final_dats
             
-            # 🚨 强效补丁：修复 types 校验 (必须是 information -> value 结构)
+            # Strong patch: fix the types validation (must be an information -> value structure)
             correct_types = perfect_dats.get("types", [{"information": {"value": "dataset"}}])
             if "types" in final_dats:
                 old_types = final_dats["types"]
-                # 检查是否为标准列表格式且包含 information 键
+                # Check that it uses the standard list form and contains the information key
                 is_valid = isinstance(old_types, list) and len(old_types) > 0 and isinstance(old_types[0], dict) and "information" in old_types[0]
                 if not is_valid:
                     print("🔧 Repairing 'types' field for schema compliance...")
@@ -400,14 +400,14 @@ def main():
         print("📝 Generating standard DATS.json...")
         final_dats = perfect_dats
 
-    # 强制写回文件 (先删除以防 symlink 锁定)
+    # Force the file back out (unlink first in case a symlink locks it)
     if os.path.lexists(dats_path):
         os.remove(dats_path)
     with open(dats_path, "w", encoding="utf-8") as f:
         json.dump(final_dats, f, indent=4, ensure_ascii=False)
     run(["git", "add", "DATS.json"], cwd=dataset_dir)
 
-    # 生成爬虫记录文件
+    # Generate the crawler record file
     tracker = {
         "node_id": node_id,
         "title": attributes.get("title", ""),

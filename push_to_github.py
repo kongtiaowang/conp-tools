@@ -35,14 +35,14 @@ def find_dataset_dir(basedir: str, record_id: str) -> Optional[str]:
         if not os.path.isdir(folder_path):
             continue
             
-        # 支持多种爬虫配置文件 (Zenodo, OSF)
+        # Support multiple crawler config files (Zenodo, OSF)
         for config_name in [".conp-zenodo-crawler.json", ".conp-osf-crawler.json"]:
             config_path = os.path.join(folder_path, config_name)
             if os.path.exists(config_path):
                 try:
                     with open(config_path, 'r') as f:
                         config = json.load(f)
-                        # 兼容 Zenodo 的 record_id 和 OSF 的 node_id
+                        # Handle both Zenodo's record_id and OSF's node_id
                         stored_id = config.get("record_id") or config.get("node_id")
                         if str(stored_id) == str(record_id):
                             return folder_path
@@ -95,7 +95,7 @@ def create_pull_request(main_repo_path: str, dataset_dir: str, repo_url: str, re
         print(f"Would run: gh pr create --repo CONP-PCNO/conp-dataset --base master --head {org}:{branch_name} ...")
         return
 
-    # --- 自动修复：清理已知会导致 Git 崩溃的损坏子模块路径 ---
+    # --- Auto-repair: clean up broken submodule paths known to crash Git ---
     broken_paths = ["projects/cneuromod_processed"]
     for bp in broken_paths:
         bp_path = os.path.join(main_repo_path, bp)
@@ -200,7 +200,7 @@ def main():
 
     record_id = args.record.split("/")[-1]
     
-    # 🌟 改进：如果指定了 main_repo 但没指定 basedir，自动使用 main_repo 寻找数据集
+    # Improvement: if main_repo is set without basedir, use main_repo to locate datasets
     search_dir = args.basedir
     if args.main_repo and args.basedir == ".":
         search_dir = args.main_repo

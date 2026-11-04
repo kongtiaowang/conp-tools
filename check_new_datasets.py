@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-check_new_datasets.py - 检查 OSF/Zenodo 上标记了 canadian-open-neuroscience-platform 的新数据集
-通过 DATS.json 中的标识符进行对比，比文件夹名更准确
+check_new_datasets.py - Find datasets newly tagged canadian-open-neuroscience-platform on OSF/Zenodo
+Compares identifiers found in DATS.json, which is more reliable than folder names
 """
 
 import os
@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import List, Dict, Set, Optional, Union
 
 def load_config():
-    """加载用户配置文件"""
+    """Load the user config file"""
     config_path = os.path.expanduser("~/.conp_crawler_config.json")
     if os.path.exists(config_path):
         with open(config_path) as f:
@@ -23,13 +23,13 @@ def load_config():
 
 def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
     """
-    从本地项目的 DATS.json 中提取标识符
-    返回: {folder_name: {identifiers: [], title, dats_path}}
+    Extract identifiers from each local project's DATS.json
+    Returns: {folder_name: {identifiers: [], title, dats_path}}
     """
     projects_data = {}
     
     if not os.path.exists(projects_dir):
-        print(f"警告: projects 目录不存在: {projects_dir}")
+        print(f"Warning: projects directory not found: {projects_dir}")
         return projects_data
     
     for folder in os.listdir(projects_dir):
@@ -37,7 +37,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
         if not os.path.isdir(folder_path):
             continue
         
-        # 查找 DATS.json 或 dats.json (大小写不敏感)
+        # Look for DATS.json or dats.json (case-insensitive)
         dats_path = None
         for filename in os.listdir(folder_path):
             if filename.lower() == 'dats.json':
@@ -45,7 +45,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
                 break
         
         if not dats_path:
-            # 如果没有 DATS.json，尝试找软链接
+            # No DATS.json found: try a symlink named dats.json
             for item in os.listdir(folder_path):
                 item_path = os.path.join(folder_path, item)
                 if os.path.islink(item_path) and item.lower() == 'dats.json':
@@ -53,8 +53,8 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
                     break
         
         if not dats_path:
-            # 没有 DATS.json，用文件夹名作为标识符
-            print(f"  警告: {folder} 没有 DATS.json，使用文件夹名作为标识符")
+            # No DATS.json at all: fall back to the folder name as identifier
+            print(f"  Warning: {folder} has no DATS.json, using the folder name as identifier")
             projects_data[folder] = {
                 'folder_name': folder,
                 'title': folder,
@@ -65,23 +65,23 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
             continue
         
         try:
-            # 读取 DATS.json
+            # Read DATS.json
             with open(dats_path, 'r') as f:
                 dats_content = json.load(f)
             
-            # 收集所有可能的标识符（转为字符串）
+            # Collect every possible identifier (as strings)
             identifiers = []
             
-            # DOI 字段
+            # DOI field
             doi = dats_content.get('doi')
             if doi:
                 identifiers.append(str(doi))
-                # 提取数字部分
+                # Extract the numeric part
                 if 'zenodo' in str(doi).lower():
                     zenodo_id = str(doi).split('/')[-1]
                     identifiers.append(zenodo_id)
             
-            # identifier 字段（可能是字符串或字典）
+            # identifier field (may be a string or a dict)
             identifier = dats_content.get('identifier')
             if identifier:
                 if isinstance(identifier, dict):
@@ -90,7 +90,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
                 else:
                     identifiers.append(str(identifier))
             
-            # extraProperties 中的标识符
+            # Identifiers from extraProperties
             for prop in dats_content.get('extraProperties', []):
                 category = prop.get('category', '')
                 if category in ['identifier', 'osf_id', 'zenodo_id', 'record_id', 'concept_id']:
@@ -99,7 +99,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
                         if val:
                             identifiers.append(str(val))
             
-            # 从 URL 中提取 ID
+            # Extract IDs from the URL
             url = dats_content.get('url', '')
             if 'zenodo.org' in url:
                 zenodo_match = re.search(r'/record/(\d+)', url)
@@ -110,7 +110,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
                 if osf_match:
                     identifiers.append(osf_match.group(1))
             
-            # 去掉 None 和空字符串，并去重
+            # Drop None/empty values and de-duplicate
             identifiers = list(set([i for i in identifiers if i]))
             
             projects_data[folder] = {
@@ -122,7 +122,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
             }
             
         except Exception as e:
-            print(f"  警告: 读取 {folder}/DATS.json 失败: {e}")
+            print(f"  Warning: failed to read {folder}/DATS.json: {e}")
             projects_data[folder] = {
                 'folder_name': folder,
                 'title': folder,
@@ -134,7 +134,7 @@ def get_local_project_identifiers(projects_dir: str) -> Dict[str, Dict]:
     return projects_data
 
 def fetch_zenodo_datasets(user_config: Dict) -> List[Dict]:
-    """从 Zenodo 获取标记了 canadian-open-neuroscience-platform 的公开数据集"""
+    """Fetch public datasets tagged canadian-open-neuroscience-platform from Zenodo"""
     datasets = []
     
     headers = {}
@@ -151,7 +151,7 @@ def fetch_zenodo_datasets(user_config: Dict) -> List[Dict]:
     }
     
     try:
-        print(f"正在从 Zenodo 获取公开数据集...")
+        print(f"Fetching public datasets from Zenodo...")
         response = requests.get(
             'https://zenodo.org/api/records/', 
             params=params, 
@@ -182,7 +182,7 @@ def fetch_zenodo_datasets(user_config: Dict) -> List[Dict]:
                         'download_url': file_info.get('links', {}).get('download', '')
                     })
                 
-                # 收集所有标识符
+                # Collect all identifiers
                 identifiers = []
                 doi = metadata.get('doi')
                 if doi:
@@ -211,17 +211,17 @@ def fetch_zenodo_datasets(user_config: Dict) -> List[Dict]:
                 }
                 datasets.append(dataset)
             
-            print(f"从 Zenodo 获取到 {len(datasets)} 个公开数据集")
+            print(f"Fetched {len(datasets)} public datasets from Zenodo")
         else:
-            print(f"Zenodo API 错误: {response.status_code}")
+            print(f"Zenodo API error: {response.status_code}")
             
     except Exception as e:
-        print(f"Zenodo API 错误: {e}")
+        print(f"Zenodo API error: {e}")
     
     return datasets
 
 def fetch_osf_datasets(user_config: Dict) -> List[Dict]:
-    """从 OSF 获取标记了 canadian-open-neuroscience-platform 的公共数据集"""
+    """Fetch public datasets tagged canadian-open-neuroscience-platform from OSF"""
     datasets = []
     
     headers = {}
@@ -236,7 +236,7 @@ def fetch_osf_datasets(user_config: Dict) -> List[Dict]:
     }
     
     try:
-        print(f"正在从 OSF 获取公共数据集...")
+        print(f"Fetching public datasets from OSF...")
         response = requests.get(
             'https://api.osf.io/v2/nodes/', 
             params=params, 
@@ -282,43 +282,43 @@ def fetch_osf_datasets(user_config: Dict) -> List[Dict]:
                 }
                 datasets.append(dataset)
             
-            print(f"从 OSF 获取到 {len(datasets)} 个公共数据集")
+            print(f"Fetched {len(datasets)} public datasets from OSF")
         else:
-            print(f"OSF API 错误: {response.status_code}")
+            print(f"OSF API error: {response.status_code}")
             
     except Exception as e:
-        print(f"OSF API 错误: {e}")
+        print(f"OSF API error: {e}")
     
     return datasets
 
 def compare_by_identifiers(remote_datasets: List[Dict], local_projects: Dict[str, Dict]) -> Dict:
     """
-    通过标识符对比远程数据集和本地项目
-    返回: {'new': [...], 'existing': [...]}
+    Compare remote datasets against local projects by identifier
+    Returns: {'new': [...], 'existing': [...]}
     """
     result = {
         'new': [],
         'existing': []
     }
     
-    # 收集所有本地标识符（转为小写字符串）
+    # Collect all local identifiers (lowercased strings)
     local_identifiers = set()
     for folder, info in local_projects.items():
         for identifier in info.get('identifiers', []):
             if identifier:
                 local_identifiers.add(str(identifier).lower())
     
-    print(f"   本地唯一标识符数量: {len(local_identifiers)}")
+    print(f"   Unique local identifiers: {len(local_identifiers)}")
     
     for dataset in remote_datasets:
         matched = False
         matched_folder = None
         
-        # 检查是否匹配任何本地标识符
+        # Check for a match against any local identifier
         for remote_id in dataset.get('identifiers', []):
             if remote_id and str(remote_id).lower() in local_identifiers:
                 matched = True
-                # 找到匹配的文件夹
+                # Find the folder that matched
                 for folder, info in local_projects.items():
                     for local_id in info.get('identifiers', []):
                         if local_id and str(remote_id).lower() == str(local_id).lower():
@@ -328,7 +328,7 @@ def compare_by_identifiers(remote_datasets: List[Dict], local_projects: Dict[str
                         break
                 break
         
-        # 如果没有匹配到标识符，尝试用标题匹配文件夹名
+        # No identifier matched: fall back to matching the title against folder names
         if not matched:
             folder_name = re.sub(r'\W|^(?=\d)', '_', dataset['title'])
             if folder_name in local_projects:
@@ -350,7 +350,7 @@ def compare_by_identifiers(remote_datasets: List[Dict], local_projects: Dict[str
     return result
 
 def format_size(size_bytes):
-    """格式化文件大小"""
+    """Format a byte size"""
     if size_bytes == 0:
         return "0 B"
     size_names = ["B", "KB", "MB", "GB", "TB"]
@@ -361,10 +361,10 @@ def format_size(size_bytes):
     return f"{size_bytes:.1f} {size_names[i]}"
 
 def send_email_notification(new_datasets: List[Dict], existing_count: int, user_config: Dict):
-    """发送邮件通知"""
+    """Send the email notification"""
     
     if not new_datasets:
-        print("没有新数据集需要通知")
+        print("No new datasets to notify about")
         return
     
     recipient = user_config.get('notify_email', 'wangshen.mcin@gmail.com')
@@ -435,12 +435,12 @@ def send_email_notification(new_datasets: List[Dict], existing_count: int, user_
             input=msg.as_bytes(),
             check=True,
         )
-        print(f"✓ 邮件已发送到: {recipient}")
+        print(f"✓ Email sent to: {recipient}")
     except Exception as e:
-        print(f"✗ 邮件发送失败: {e}")
+        print(f"✗ Failed to send email: {e}")
 
 def save_report(new_datasets: List[Dict], log_dir: str):
-    """保存报告"""
+    """Save the report"""
     os.makedirs(log_dir, exist_ok=True)
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -457,10 +457,10 @@ def save_report(new_datasets: List[Dict], log_dir: str):
     with open(report_file, 'w') as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
     
-    print(f"✓ 报告已保存: {report_file}")
+    print(f"✓ Report saved: {report_file}")
 
 def main():
-    """主函数"""
+    """Entry point"""
     print("=" * 60)
     print("CONP Dataset Discovery Tool")
     print("Matching by identifiers from DATS.json")
@@ -472,36 +472,36 @@ def main():
     projects_dir = os.path.join(conp_dataset_path, 'projects')
     log_dir = os.path.join(conp_dataset_path, 'log')
     
-    print(f"\nProjects 目录: {projects_dir}")
+    print(f"\nProjects directory: {projects_dir}")
     
-    print("\n1. 读取本地项目的 DATS.json...")
+    print("\n1. Reading DATS.json from local projects...")
     local_projects = get_local_project_identifiers(projects_dir)
-    print(f"   找到 {len(local_projects)} 个本地项目")
+    print(f"   Found {len(local_projects)} local projects")
     
-    # 显示部分标识符示例
+    # Show a few sample identifiers
     count = 0
     for folder, info in local_projects.items():
         if info.get('identifiers') and count < 5:
             print(f"   {folder}: {info['identifiers'][:3]}")
             count += 1
     
-    print("\n2. 从 Zenodo 获取公开数据集...")
+    print("\n2. Fetching public datasets from Zenodo...")
     zenodo_datasets = fetch_zenodo_datasets(user_config)
     
-    print("\n3. 从 OSF 获取公共数据集...")
+    print("\n3. Fetching public datasets from OSF...")
     osf_datasets = fetch_osf_datasets(user_config)
     
     all_remote = zenodo_datasets + osf_datasets
-    print(f"\n   总共获取到 {len(all_remote)} 个公开远程数据集")
+    print(f"\n   Total remote public datasets: {len(all_remote)}")
     
-    print("\n4. 通过标识符对比本地和远程...")
+    print("\n4. Comparing local and remote by identifier...")
     comparison = compare_by_identifiers(all_remote, local_projects)
     
-    print(f"\n   已存在数据集: {len(comparison['existing'])}")
-    print(f"   ✨ 新数据集: {len(comparison['new'])}")
+    print(f"\n   Existing datasets: {len(comparison['existing'])}")
+    print(f"   ✨ New datasets: {len(comparison['new'])}")
     
     if comparison['new']:
-        print(f"\n📦 新发现 {len(comparison['new'])} 个公开数据集:")
+        print(f"\n📦 Newly discovered {len(comparison['new'])} public datasets:")
         print("=" * 80)
         for i, ds in enumerate(comparison['new'], 1):
             print(f"\n{i:2}. {ds['title']}")
@@ -513,16 +513,16 @@ def main():
                 print(f"     Files: {len(ds['files'])}")
             print("-" * 60)
     else:
-        print("\n没有发现新的公开数据集")
+        print("\nNo new public datasets found")
     
-    print("\n5. 发送邮件通知...")
+    print("\n5. Sending email notification...")
     send_email_notification(comparison['new'], len(local_projects), user_config)
     
-    print("\n6. 保存报告...")
+    print("\n6. Saving report...")
     save_report(comparison['new'], log_dir)
     
     print("\n" + "=" * 60)
-    print("完成!")
+    print("Done!")
     print("=" * 60)
 
 if __name__ == "__main__":
